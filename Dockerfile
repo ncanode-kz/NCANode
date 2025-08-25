@@ -28,4 +28,4 @@ EXPOSE 14579
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar NCANode.jar"]
 
 HEALTHCHECK --interval=20s --timeout=30s --retries=7 \
-    CMD wget -O - http://127.0.0.1:14579/actuator/health å| grep -v DOWN || exit 1
+    CMD wget -O - http://127.0.0.1:14579/actuator/health | grep -v DOWN || exit 1
