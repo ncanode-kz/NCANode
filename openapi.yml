@@ -1,772 +1,800 @@
-openapi: 3.0.3
+openapi: 3.0.1
 info:
-  title: NCANode 3.x HTTP API
-  description: Документация API для NCANode 3.x
-  version: 3.0.0
-  license:
-    name: MIT
-    url: https://github.com/malikzh/NCANode/blob/master/LICENSE
-  contact:
-    name: Malik Zharykov
-    url: https://github.com/malikzh
-    email: cmalikz.h@gmail.com
-
+  title: OpenAPI definition
+  version: v0
 servers:
-  - url: http://localhost:14579/
-    description: Локальный сервер
-
+  - url: ''
+    description: current server
 tags:
-  - name: Info
-    description: Методы для получения информации
+  - name: Pkcs12
+    description: Методы для работы с Pkcs12
+  - name: CMS
+    description: Методы для работы с CMS
+  - name: PDF
+    description: Методы для работы с PDF
+  - name: WSSE
+    description: Методы для работы с WSSE
+  - name: X509
+    description: Методы для работы с x509
   - name: XML
     description: Методы для работы с XML
-  - name: Wsse
-    description: Методы для работы с SOAP Wsse (SmartBridge)
-  - name: CMS
-    description: Методы для работы с CMS (Cryptogrphic Message Syntax)
-  - name: Maintenance
-    description: Методы для получении информации о состоянии сервера
-
+  - name: Actuator
+    description: Monitor and interact
+    externalDocs:
+      description: Spring Boot Actuator Web API Documentation
+      url: https://docs.spring.io/spring-boot/docs/current/actuator-api/html/
 paths:
-
-  ### INFO ###
-  /pkcs12/info:
-    post:
-      tags:
-        - Info
-      summary: Возвращает информацию о ключе, его владельце и т.д.
-      requestBody:
-        content:
-          application/json:
-            schema:
-              allOf:
-                - $ref: '#/components/schemas/VerifyRequest'
-                - properties:
-                    keys:
-                      type: array
-                      minItems: 1
-                      items:
-                        $ref: '#/components/schemas/SignerRequest'
-      responses:
-        '200':
-          $ref: '#/components/responses/VerificationResponse'
-
-  /pkcs12/aliases:
-    post:
-      tags:
-        - Info
-      summary: Возвращает список алиасов для ключей.
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                keys:
-                  type: array
-                  minItems: 1
-                  items:
-                    $ref: '#/components/schemas/SignerRequest'
-      responses:
-        '200':
-          $ref: '#/components/responses/AliasesResponse'
-
-  /x509/info:
-    post:
-      tags:
-        - Info
-      summary: Возвращает информацию о сертификате
-      requestBody:
-        content:
-          application/json:
-            schema:
-              allOf:
-                - $ref: '#/components/schemas/VerifyRequest'
-                - properties:
-                    certs:
-                      type: array
-                      example: [ 'LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUYrekNDQStPZ0F3SUJBZ0lVUWVSY3lLQk1jRmxqNWMxbmFZU0trMDJPcnZVd0RRWUpLb1pJaHZjTkFRRUwKQlFBd0xURUxNQWtHQTFVRUJoTUNTMW94SGpBY0JnTlZCQU1NRmRLdzBKclFuaUF6TGpBZ0tGSlRRU0JVUlZOVQpLVEFlRncweU1qQXhNVGd3TkRNNE5UQmFGdzB5TXpBeE1UZ3dORE00TlRCYU1Ia3hIakFjQmdOVkJBTU1GZENpCjBKWFFvZENpMEo3UWtpRFFvdENWMEtIUW9qRVZNQk1HQTFVRUJBd00wS0xRbGRDaDBLTFFudENTTVJnd0ZnWUQKVlFRRkV3OUpTVTR4TWpNME5UWTNPRGt3TVRFeEN6QUpCZ05WQkFZVEFrdGFNUmt3RndZRFZRUXFEQkRRb3RDVgowS0hRb3RDZTBKTFFtTkNuTUlJQklqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FROEFNSUlCQ2dLQ0FRRUF5eFRFCnVSb250SzgvUVFDMWVoWnlGdmFHYStLOXM1YmlWRXc5VGRhSEJSeERlWVV1V1d3K1Nqc21OVEhEUzBLYmYvOWUKSUxwMG9weUVTL0NaclFPaUVQeUlQRW03QmNsRGlzRmt2UTFBT3RSWjlmWnhYTVdpeFR2MDA0VVA0ZUFDMXBFKwpLbWxORlAxSHdVbkdhWTBrOUxrdk45aVVoR2d6KzViUUluOW1Ib21qME5WZnUyaml3ZjQ4bXhaaTZHYzM1OEIxCkhOSTVvK3BFdzduUFN4TWpsNmVHamc2SWkrUWNZZGhMN2NtTWZER2Y4RFIvWjEvczlBUUg4K294WlkrMy9icE4KSE1PaHZjMXUzejZrWEp5bUpuSUJ0RnRyR1V6eGtzdHlFcFNpbzJOYmxlZnk3NzVyckhMbXpXZmdOV0h6SDZJKwpmdTJ3UGhIVW9EWkRaR0wydndJREFRQUJvNElCeFRDQ0FjRXdEZ1lEVlIwUEFRSC9CQVFEQWdiQU1CMEdBMVVkCkpRUVdNQlFHQ0NzR0FRVUZCd01FQmdncWd3NERBd1FCQVRBZkJnTlZIU01FR0RBV2dCU21qQll6Zkxqb05XY0cKUGw1QlYxV2lyelJRYURBZEJnTlZIUTRFRmdRVXBQV2gvNDlWcTZXYnNrU2lWZFNscVlEZEJvc3dYZ1lEVlIwZwpCRmN3VlRCVEJnY3FndzREQXdJRE1FZ3dJUVlJS3dZQkJRVUhBZ0VXRldoMGRIQTZMeTl3YTJrdVoyOTJMbXQ2CkwyTndjekFqQmdnckJnRUZCUWNDQWpBWERCVm9kSFJ3T2k4dmNHdHBMbWR2ZGk1cmVpOWpjSE13UEFZRFZSMGYKQkRVd016QXhvQytnTFlZcmFIUjBjRG92TDNSbGMzUXVjR3RwTG1kdmRpNXJlaTlqY213dmJtTmhYM0p6WVY5MApaWE4wTG1OeWJEQStCZ05WSFM0RU56QTFNRE9nTWFBdmhpMW9kSFJ3T2k4dmRHVnpkQzV3YTJrdVoyOTJMbXQ2CkwyTnliQzl1WTJGZlpGOXljMkZmZEdWemRDNWpjbXd3Y2dZSUt3WUJCUVVIQVFFRVpqQmtNRGdHQ0NzR0FRVUYKQnpBQ2hpeG9kSFJ3T2k4dmRHVnpkQzV3YTJrdVoyOTJMbXQ2TDJObGNuUXZibU5oWDNKellWOTBaWE4wTG1ObApjakFvQmdnckJnRUZCUWN3QVlZY2FIUjBjRG92TDNSbGMzUXVjR3RwTG1kdmRpNXJlaTl2WTNOd0x6QU5CZ2txCmhraUc5dzBCQVFzRkFBT0NBZ0VBRUNiYXBwT3VYT2kvZUJsSFArU29vTkIzSDd4MmEyeC9hWC8zeWNHbGVVYU8KbnpPRlQvMVA4N1gyaHAzRkxGQ0JUWlVJN1FWQ1ZlQVVWVkE1eVJtOFZmQ1pENjBoZ2lzQmFobDdHbVdtUlkxMQo0ZGNRWlgzRVZZUVJYUlp4d3l6UUZUZjBTNTBPRnIwWGUxU3hBMG1iNTA2MUpDT2F2OVUzN1lXSE9Mci8wMlZ4ClFsS2x5TSs2UEU1R1o1bzM2ZVphZXNNazcyUVNKejlyMStmZDVjWUd1QlNOUWppR0xXMjc5cTlrMTJLRWJmYlQKaFk2M1VyMFBBTkNZSmVieGhDN3F1ckIrb3pvNnpvcnVvSWl6V0ttSmRZblFyT0hZSHUybG9wOWVGdkRLc0V6bwpQbzluaFMvSUNjUzUrNWh2aE9lVWxLaUU5S2w2NllNRytnOVR4dWFXTUV3ODl2L3ZGMzh4U3JvVnpvVklhRGFRCmFWMmlBdG16b3BkQ1MvZ2szVXZrS3BrZytVQmxmWlRVZEFSdUIrL3hnS2N3MGlkVk94S0VkV2ZzYVZTVU14SUEKSVRwem8rVU1TMkJoVUR1dDlObVRJVGllWFpGU0twMVh5VW00ODNlR0pvRzBNcjRBeG9YRDRHL2NPc0V1OFVsUgpCZThkbEJHZEZOSXR6R29TUnVvaERSMEl2a0pvcUN0S0QwVGtmRlJzUk90NS9EcWNUWG4xTll1Tkg0d2QwT3dhCkF4R1FMcjc2VURPbm1EU3d5V005YXJ5SG10WG8vME1kOHVnSzFCamErdTR0WFVnMlNnWlZ6R3BxV0ZDL3JkRkUKRU85cU5UWTdJK2x3MDA2Yk1BVWlUWFRoWGhweDRJczQ1UnY1a0N5SGlabnFZalB0VS93ckxHS2FjV3lLb0NVPQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg==' ]
-                      description: Сертификаты в формате Base64
-                      items:
-                        type: string
-                        description: Сертификат в формате Base64
-      responses:
-        '200':
-          $ref: '#/components/responses/VerificationResponse'
-
-  ### XML ###
-  /xml/sign:
-    post:
-      tags:
-        - XML
-      summary: Подписывает XML ключами переданными в signers используя XMLDSig
-      description: |
-        Этот метод может также добавлять подписи уже в существующий XML. Для этого,
-        просто передайте в этот метод подписанную XML строку.
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              description: Запрос на подпись XML
-              required:
-                - xml
-                - signers
-              properties:
-                xml:
-                  type: string
-                  example: '<?xml version=\"1.0\" encoding=\"utf-8\"?><a><b>test</b></a>'
-                  description: XML Строка для подписи
-                signers:
-                  $ref: '#/components/schemas/Signers'
-                clearSignatures:
-                  type: boolean
-                  description: Если true, то удалить прошлы подписи и добавить новые.
-                  example: false
-                trimXml:
-                  $ref: '#/components/schemas/TrimXML'
-      responses:
-        200:
-          $ref: '#/components/responses/XMLSignResponse'
-
   /xml/verify:
     post:
       tags:
         - XML
-      summary: Проверяет все подписи в XML
+      operationId: verify
       requestBody:
-        $ref: '#/components/requestBodies/XMLVerifyRequest'
-      responses:
-        '200':
-          $ref: '#/components/responses/VerificationResponse'
-
-  ### WSSE ###
-  /wsse/sign:
-    post:
-      tags:
-        - Wsse
-      summary: Подписывает SOAP-конверт
-      requestBody:
-        description: Запрос на подпись Wsse
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - xml
-                - key
-                - password
-              properties:
-                xml:
-                  type: string
-                  description: SOAP-конверт для подписи. Его можно взять из примера SmartBridge.
-                  example: '<?xml version="1.0" encoding="UTF-8" standalone="no"?><SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/"><SOAP-ENV:Header><wsse:Security xmlns:wsse="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd" xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" SOAP-ENV:mustUnderstand="1"><ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#"> <ds:SignedInfo> <ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/> <ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/> <ds:Reference URI="#id-0ace83d4-0477-4890-90b2-50b3bd434949"> <ds:Transforms> <ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/> </ds:Transforms> <ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/> <ds:DigestValue>eqb07lP5ddRlF3l0RYWk7ZwYDjoifevOji7IqgtnX/I=</ds:DigestValue> </ds:Reference> </ds:SignedInfo> <ds:SignatureValue> UtsuKUTvau85Pdl2LN9o5GAuqMsoB6bV+t/WzPHlhRL3iEu6+J82Ib1GMdLdV6wTNZVW7szRgWz3&#13; mjxyyo9PVyytjyCWHyfFl7NPcAxM220cvW3+lVhNdpVqhQQ8l5e+zJQWwMdRreevj5qxWw4KxZRP&#13; rZ7xxyG05tq3NuVFonfbQ48TzHOdBTixbyPyi8rvmf663N0v0h8+wMZblZPy/7IMLJygbw1va6MU&#13; O62+gqaNBwDXSxGysozb2Zoc9Kg/ST7tcTeowB5VUbd0WJd+aH+R3OCa1goQMhse4BsNxrU0SnnC&#13; ngGRfppW9X6JHGjv5s7WO7Y+YPB9gqeN71+Huw== </ds:SignatureValue> <ds:KeyInfo> <wsse:SecurityTokenReference><wsse:KeyIdentifier EncodingType="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-soap-message-security-1.0#Base64Binary" ValueType="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-x509-token-profile-1.0#X509v3">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</wsse:KeyIdentifier></wsse:SecurityTokenReference> </ds:KeyInfo> </ds:Signature></wsse:Security></SOAP-ENV:Header><SOAP-ENV:Body xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" wsu:Id="id-0ace83d4-0477-4890-90b2-50b3bd434949"><ns3:SendMessage xmlns:ns3="http://bip.bee.kz/SyncChannel/v10/Types"><request><requestInfo><messageId>ccb1010b-8446-4937-913f-c87a717f6809</messageId><serviceId>GBDFL_UniversalServiceSync</serviceId><messageDate>2019-12-25T12:48:21.024Z</messageDate><sender><senderId>smartbridge</senderId><password>123</password></sender><properties><key>CONNECTOR_CLIENT</key><value>true</value></properties></requestInfo><requestData><ns4:data xmlns:cs="http://message.persistence.interactive.nat" xmlns:ns4="http://bip.bee.kz/SyncChannel/v10/Interfaces" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="cs:Request"><messageId>1</messageId><messageDate>2017-10-12T15:22:16.183+06:00</messageDate><senderCode>smartbridge</senderCode><iin>931002451325</iin></ns4:data></requestData></request></ns3:SendMessage></SOAP-ENV:Body></SOAP-ENV:Envelope>'
-                key:
-                  $ref: '#/components/schemas/SignerKey'
-                password:
-                  $ref: '#/components/schemas/SignerPassword'
-                keyAlias:
-                  $ref: '#/components/schemas/SignerAlias'
-                trimXml:
-                  $ref: '#/components/schemas/TrimXML'
+              $ref: '#/components/schemas/XmlVerifyRequest'
+        required: true
       responses:
         '200':
-          $ref: '#/components/responses/XMLSignResponse'
-
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/VerificationResponse'
+  /xml/sign:
+    post:
+      tags:
+        - XML
+      operationId: sign
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/XmlSignRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/XmlSignResponse'
+  /x509/verify:
+    post:
+      tags:
+        - X509
+      operationId: verify_1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SbaVerifyRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/VerificationResponse'
+  /x509/info:
+    post:
+      tags:
+        - X509
+      operationId: verify_2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/X509InfoRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/VerificationResponse'
   /wsse/verify:
     post:
       tags:
-        - Wsse
-      summary: Проверяет подписанный SOAP-конверт
+        - WSSE
+      operationId: verify_3
       requestBody:
-        $ref: '#/components/requestBodies/XMLVerifyRequest'
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/XmlVerifyRequest'
+        required: true
       responses:
         '200':
-          $ref: '#/components/responses/VerificationResponse'
-
-  ### CMS ###
-  /cms/sign:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/VerificationResponse'
+  /wsse/sign:
     post:
       tags:
-        - CMS
-      summary: Создает подись данных в формате CMS.
+        - WSSE
+      operationId: sign_1
       requestBody:
-        $ref: '#/components/requestBodies/CmsCreateRequest'
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WsseSignRequest'
+        required: true
       responses:
         '200':
-          $ref: '#/components/responses/CmsResponse'
-  /cms/sign/add:
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/XmlSignResponse'
+  /pkcs12/info:
     post:
       tags:
-        - CMS
-      summary: Добавляет подпись в существующий CMS.
+        - Pkcs12
+      operationId: info
       requestBody:
-        $ref: '#/components/requestBodies/CmsSignAddRequest'
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Pkcs12InfoRequest'
+        required: true
       responses:
         '200':
-          $ref: '#/components/responses/CmsResponse'
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/VerificationResponse'
+  /pkcs12/aliases:
+    post:
+      tags:
+        - Pkcs12
+      operationId: aliases
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Pkcs12InfoRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/Pkcs12AliasesResponse'
+  /pdf/verify:
+    post:
+      tags:
+        - PDF
+      operationId: verify_4
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PdfVerifyRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PdfVerificationResponse'
+  /pdf/sign:
+    post:
+      tags:
+        - PDF
+      operationId: sign_2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PdfSignRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PdfSignResponse'
   /cms/verify:
     post:
       tags:
         - CMS
-      summary: Проверяет подписанный CMS.
+      operationId: verify_5
       requestBody:
-        description: Запрос на проверку подписи
         content:
           application/json:
             schema:
-              allOf:
-                - $ref: '#/components/schemas/VerifyRequest'
-                - properties:
-                    cms:
-                      $ref: '#/components/schemas/Cms'
-                    data:
-                      allOf:
-                        - $ref: '#/components/schemas/CmsData'
-                        - description: Если необходимо проверить открепленную подпись CMS, то также необходимо передать сами подписанные данные в формате Base64.
-                - required:
-                    - cms
+              $ref: '#/components/schemas/CmsVerifyRequest'
+        required: true
       responses:
         '200':
-          $ref: '#/components/responses/CmsVerificationResponse'
-
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CmsVerificationResponse'
+  /cms/sign:
+    post:
+      tags:
+        - CMS
+      operationId: sign_3
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CmsCreateRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CmsResponse'
+  /cms/sign/add:
+    post:
+      tags:
+        - CMS
+      operationId: signAdd
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CmsCreateRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CmsResponse'
   /cms/extract:
     post:
       tags:
         - CMS
-      summary: Извлекает данные из подписанной CMS.
+      operationId: extract
       requestBody:
-        description: Запрос на извлечение данных из подписи
         content:
           application/json:
             schema:
-              type: object
-              required:
-                - cms
-              properties:
-                cms:
-                  $ref: '#/components/schemas/Cms'
+              $ref: '#/components/schemas/CmsVerifyRequest'
+        required: true
       responses:
         '200':
-          description: Извлеченные данные из CMS в формате Base64.
+          description: OK
           content:
-            application/json:
+            '*/*':
               schema:
-                allOf:
-                  - $ref: '#/components/schemas/ResponseStatus'
-                  - properties:
-                      data:
-                        type: string
-                        example: bG9sIGtlaw==
-                        description: Извлеченные данные из CMS в формате Base64
-  /actuator/health:
+                $ref: '#/components/schemas/CmsDataResponse'
+  /actuator:
     get:
       tags:
-        - Maintenance
-      summary: Получает состояние сервера. Можно использовать в качестве метода для проверки состояния сервера Healthcheck.
+        - Actuator
+      summary: Actuator root web endpoint
+      operationId: links
       responses:
         '200':
-          description: Информация о состоянии сервера
+          description: OK
           content:
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+                  additionalProperties:
+                    $ref: '#/components/schemas/Link'
+            application/vnd.spring-boot.actuator.v2+json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+                  additionalProperties:
+                    $ref: '#/components/schemas/Link'
             application/json:
               schema:
                 type: object
-                properties:
-                  status:
-                    type: string
-                    example: UP
-                    enum:
-                      - UP
-                      - DOWN
-                      - OUT_OF_SERVICE
-                      - UNKOWN
-                    description: >
-                      Текущее состояние сервера.
-                      
-                      * `UP` - Все ок, сервер работает
-                      
-                      * `DOWN` - Сервер не готов обслуживать
-                      
-                      * `OUT_OF_SERVICE` - Сервер временно неработоспособен
-                      
-                      * `UNKOWN` - Состояние неизвестно
-
+                additionalProperties:
+                  type: object
+                  additionalProperties:
+                    $ref: '#/components/schemas/Link'
+  /actuator/health:
+    get:
+      tags:
+        - Actuator
+      summary: Actuator web endpoint 'health'
+      operationId: health
+      responses:
+        '200':
+          description: OK
+          content:
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                type: object
+            application/vnd.spring-boot.actuator.v2+json:
+              schema:
+                type: object
+            application/json:
+              schema:
+                type: object
+  /actuator/health/**:
+    get:
+      tags:
+        - Actuator
+      summary: Actuator web endpoint 'health-path'
+      operationId: health-path
+      responses:
+        '200':
+          description: OK
+          content:
+            application/vnd.spring-boot.actuator.v3+json:
+              schema:
+                type: object
+            application/vnd.spring-boot.actuator.v2+json:
+              schema:
+                type: object
+            application/json:
+              schema:
+                type: object
 components:
-  requestBodies:
-    XMLVerifyRequest:
-      description: Запрос на проверку XML/WSSE
-      content:
-        application/json:
-          schema:
-            allOf:
-              - required:
-                  - xml
-              - $ref: '#/components/schemas/VerifyRequest'
-              - properties:
-                  xml:
-                    $ref: '#/components/schemas/SignedXML'
-
-    CmsCreateRequest:
-      description: Запрос на создание CMS
-      content:
-        application/json:
-          schema:
-            allOf:
-              - $ref: '#/components/schemas/CmsCreate'
-              - required:
-                  - data
-                  - signers
-
-    CmsSignAddRequest:
-      description: Запрос на добавление подписи в существующую CMS.
-      content:
-        application/json:
-          schema:
-            allOf:
-              - $ref: '#/components/schemas/CmsCreate'
-              - properties:
-                  cms:
-                    $ref: '#/components/schemas/Cms'
-              - required:
-                  - cms
-                  - signers
-  responses:
-    XMLSignResponse:
-      description: Подписанный XML
-      content:
-        application/json:
-          schema:
-            allOf:
-              - $ref: '#/components/schemas/ResponseStatus'
-              - properties:
-                  xml:
-                    $ref: '#/components/schemas/SignedXML'
-
-    AliasesResponse:
-      description: Список алиасов для каждого сертификата.
-      content:
-        application/json:
-          schema:
-            allOf:
-              - $ref: '#/components/schemas/ResponseStatus'
-              - properties:
-                  aliases:
-                    type: array
-                    description: Список алиасов для каждого ключа.
-                    items:
-                      type: array
-                      description: Список алиасов.
-                      items:
-                        type: string
-                        description: Алиас.
-                        example: e3fe35adda3b45cbea3a3f1ed48f263dc55c556e
-
-    VerificationResponse:
-      description: Результат проверки подписей в XML
-      content:
-        application/json:
-          schema:
-            allOf:
-              - $ref: '#/components/schemas/ResponseStatus'
-              - properties:
-                  valid:
-                    type: boolean
-                    example: true
-                    description: >
-                      Результат проверки всех подписей. Если всё ок, будет true, если хотя бы одна подпись невалидна, то false.
-                      На результат значения также влияет параметр `revocationCheck`. Если, например, указан `OCSP`, то
-                      результат проверки OCSP будет влиять на значение этого параметра.
-                  signers:
-                    type: array
-                    description: Информация о сертификатах
-                    items:
-                      $ref: '#/components/schemas/CertificateInfo'
-    CmsResponse:
-      description: Подписанный CMS файл
-      content:
-        application/json:
-          schema:
-            allOf:
-              - $ref: '#/components/schemas/ResponseStatus'
-              - properties:
-                  cms:
-                    $ref: '#/components/schemas/Cms'
-
-    CmsVerificationResponse:
-      description: Результат проверки CMS подписи
-      content:
-        application/json:
-          schema:
-            allOf:
-              - $ref: '#/components/schemas/ResponseStatus'
-              - properties:
-                  valid:
-                    type: boolean
-                    example: true
-                    description: > 
-                      Если CMS подпись корректная, то результат будет `true`.
-                      Имейте ввиду, что на этот параметр также влияет результат проверки в OCSP и CRL, если таковые выбраны.
-                  signers:
-                    type: array
-                    description: Информация о сертификатах
-                    items:
-                      $ref: '#/components/schemas/CmsSignerInfo'
-
   schemas:
-    ### COMMON ###
-    TrimXML:
-      type: boolean
-      example: false
-      default: false
-      description: Если true, то перед подписью NCANode удалит пробелы и переносы строк XML.
-
-    SignedXML:
-      type: string
-      description: Подписанная XML строка
-      example: '<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"no\"?><a><b>test</b><ds:Signature xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\">\r\n<ds:SignedInfo>\r\n<ds:CanonicalizationMethod Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\"/>\r\n<ds:SignatureMethod Algorithm=\"http://www.w3.org/2001/04/xmldsig-more#gost34310-gost34311\"/>\r\n<ds:Reference URI=\"\">\r\n<ds:Transforms>\r\n<ds:Transform Algorithm=\"http://www.w3.org/2000/09/xmldsig#enveloped-signature\"/>\r\n<ds:Transform Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315#WithComments\"/>\r\n</ds:Transforms>...'
-
-    SignerKey:
-      type: string
-      description: Ключ закодированный в формате Base64
-      example: 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
-
-    SignerPassword:
-      type: string
-      description: Пароль от ключа
-      example: Qwerty12
-
-    SignerAlias:
-      type: string
-      description: Алиас ключа в хранилище PKCS12
-      nullable: true
-      example: null
-
-    SignerRequest:
-      type: object
-      description: Формат запроса на получение информации о ключах
+    XmlVerifyRequest:
       required:
-        - key
-        - password
-      properties:
-        key:
-          $ref: '#/components/schemas/SignerKey'
-        password:
-          $ref: '#/components/schemas/SignerPassword'
-        keyAlias:
-          $ref: '#/components/schemas/SignerAlias'
-
-    Signers:
-      type: array
-      description: Список ключей для подписи XML
-      minItems: 1
-      items:
-        $ref: '#/components/schemas/SignerRequest'
-
-    TsaPolicy:
-      type: string
-      description: TSA Policy for TSP Token
-      example: TSA_GOST2015_POLICY
-      default: TSA_GOST2015_POLICY
-      enum:
-        - TSA_GOST_POLICY
-        - TSA_GOSTGT_POLICY
-        - TSA_GOST2015_POLICY
-
-    Cms:
-      type: string
-      example: MIIMQQYJKoZIhvcNAQcCoIIMMjCCDC4CAQExDjAMBggqgw4DCgEDAQUAMBYGCSqGSIb3DQEHAaAJBAdsb2wga2VroIIEljCCBJIwggQ8oAMCAQICFGC6RWiumPpSKhP6cRxstgxpvuLEMA0GCSqDDgMKAQEBAgUAMFMxCzAJBgNVBAYTAktaMUQwQgYDVQQDDDvSsNCb0KLQotCr0pog...
-      description: CMS-данные закодированные с помощью алгоритма Base64.
-
-    ## certificate info
-
-    CertificateRevocation:
-      type: string
-      example: OCSP
-      enum:
-        - OCSP
-        - CRL
-
-    CertificateRevocationStatus:
+        - xml
       type: object
-      description: Статус отозванности в OCSP/CRL
       properties:
-        revoked:
-          type: boolean
-          description: Отозван ли сертификат
-          example: false
-        by:
-          allOf:
-            - $ref: '#/components/schemas/CertificateRevocation'
-            - description: В каком сервисе был отозван сертификат (OCSP/CRL)
-        revocationTime:
+        revocationCheck:
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+            enum:
+              - OCSP
+              - CRL
+        xml:
           type: string
-          description: Дата и время отзыва сертификата
-          example: 2022-09-28T16:03:41.000+00:00
-        reason:
-          type: string
-          example: null
-          description: Причина отзыва сертификата
-
-    CertificateKeyUser:
-      type: string
-      enum:
-        - INDIVIDUAL
-        - ORGANIZATION
-        - CEO
-        - CAN_SIGN
-        - CAN_SIGN_FINANCIAL
-        - HR
-        - EMPLOYEE
-        - NCA_PRIVILEGES
-        - NCA_ADMIN
-        - NCA_MANAGER
-        - NCA_OPERATOR
-        - IDENTIFICATION
-        - IDENTIFICATION_CON
-        - IDENTIFICATION_REMOTE
-        - IDENTIFICATION_REMOTE_DIGITAL_ID
-      example: INDIVIDUAL
-      description: >
-        Пользователь ключа. По этому полю можно узнать к какой "роли" принадлежит ключ, физ.лицо или компания и т.д.
-        
-        * `INDIVIDUAL` - Физ. лицо
-        
-        * `ORGANIZATION` - Организация
-        
-        * `CEO` - Первый руководитель
-        
-        * `CAN_SIGN` - Сотрудник с правом подписи
-        
-        * `CAN_SIGN_FINANCIAL` - Сотрудник с правом подписи финансовых документов
-        
-        * `HR` - Сотрудник отдела кадров
-        
-        * `EMPLOYEE` - Сотрудник организации
-        
-        * `NCA_PRIVILEGES` - Полномочия в информационной системе НУЦ РК
-        
-        * `NCA_ADMIN` - Администратор НУЦ РК
-        
-        * `NCA_MANAGER` - Менеджер НУЦ РК
-        
-        * `NCA_OPERATOR` - Оператор НУЦ РК
-        
-        * `IDENTIFICATION` - Ключ прошел идентификацию
-        
-        * `IDENTIFICATION_CON` - Идентификация через оператора ЦОН
-        
-        * `IDENTIFICATION_REMOTE` - Удаленная идентификация
-        
-        * `IDENTIFICATION_REMOTE_DIGITAL_ID` - Владелец ключа прошел идентификацию с помощью DigitalID.
-
-    CertificateSubject:
-      type: object
-      description: Информация о сертификате. Не все поля могут присутствовать.
-      properties:
-        commonName:
-          type: string
-          example: ТЕСТОВ ТЕСТ
-          description: Имя и фамилия
-        lastName:
-          type: string
-          example: ТЕСТОВИЧ
-          description: Обычно отчество. Но это не точно.
-        surName:
-          type: string
-          example: ТЕСТОВ
-          description: Фамилия
-        email:
-          type: string
-          example: test@example.com
-          description: E-mail
-        organization:
-          type: string
-          example: "ТОВАРИЩЕСТВО С ОГРАНИЧЕННОЙ ОТВЕТСТВЕННОСТЬЮ \"РОГА И КОПЫТА\""
-          description: Название организации
-        gender:
-          type: string
-          example: FEMALE
-          enum:
-            - NONE
-            - MALE
-            - FEMALE
-          description: >
-            Пол.
-            
-            * `NONE` - Неизвестно
-            
-            * `MALE` - Мужской
-            
-            * `FEMALE` - Женский
-        iin:
-          type: string
-          example: 061231231234
-          description: ИИН
-        bin:
-          type: string
-          example: 061231231234
-          description: БИН
-        country:
-          type: string
-          example: KZ
-          description: Страна
-        locality:
-          type: string
-          example: ALMATY
-          description: Регион
-        state:
-          type: string
-          example: ALMATY
-          description: Регион/Провинция
-        dn:
-          type: string
-          example: EMAILADDRESS=TEST@EXAMPLE.COM, O=\"ТОВАРИЩЕСТВО С ОГРАНИЧЕННОЙ ОТВЕТСТВЕННОСТЬЮ \\\"РОГА И КОПЫТА\\\"\", GIVENNAME=ТЕСТОВИЧ, OU=BIN123412341234, C=KZ, SERIALNUMBER=IIN123412341234, CN=ТЕСТОВ ТЕСТ, SURNAME=ТЕСТОВ
-
     CertificateInfo:
       type: object
-      description: Информация о сертификате
       properties:
         valid:
           type: boolean
-          description: |
-            Если сертификат валидный, то будет true, иначе false. Стоить отметить, что на результат этого поля
-            влияет кем выдан сертификат, срок и статусы ocsp и сrl, если указан аргумент revocationCheck.
         revocations:
           type: array
-          description: |
-            Список проверок на отозванность. В каком сервисе проверялась отозванность сертификата можно узнать
-            по полу "by".
           items:
             $ref: '#/components/schemas/CertificateRevocationStatus'
         notBefore:
           type: string
-          example: 2022-05-02T08:38:13.000+00:00
-          description: Поле "не ранее". Другими словами, дата начала действия сертификата.
+          format: date-time
         notAfter:
           type: string
-          example: 2023-05-02T08:38:13.000+00:00
-          description: Поле "не позднее". Другими словами, дата окончания действия сертификата.
+          format: date-time
         keyUsage:
           type: string
-          example: SIGN
           enum:
             - UNKNOWN
             - AUTH
             - SIGN
-          description: Поле "Использование ключа". По этому полю можно понять, это сертификат для подписи или для аутентификации.
         serialNumber:
           type: string
-          example: 60ba4568ae98fa522a13fa711c6cb60c69bee2c4
-          description: Серийиный номер сертификата.
         signAlg:
           type: string
-          example: ECGOST34310
-          description: Алгоритм подписи использованный в сертификате
         keyUser:
+          uniqueItems: true
           type: array
-          description: Пользователь ключа
           items:
-            $ref: '#/components/schemas/CertificateKeyUser'
-          example: [ CEO, ORGANIZATION, IDENTIFICATION_REMOTE_DIGITAL_ID]
+            type: string
+            enum:
+              - INDIVIDUAL
+              - ORGANIZATION
+              - CEO
+              - CAN_SIGN
+              - CAN_SIGN_FINANCIAL
+              - HR
+              - EMPLOYEE
+              - NCA_PRIVILEGES
+              - NCA_ADMIN
+              - NCA_MANAGER
+              - NCA_OPERATOR
+              - IDENTIFICATION
+              - IDENTIFICATION_CON
+              - IDENTIFICATION_REMOTE
+              - IDENTIFICATION_REMOTE_DIGITAL_ID
         publicKey:
           type: string
-          example: AQEGCiqDDgMKAQMBAQADQwAEQNCA6hr4brWULD+tUvKCEqttjkgn
-          description: Публичный ключ, закодированный в формате Base64.
         signature:
           type: string
-          example: wRgLVl6m2wBifamg/e2ZHAVfI1X9h0109c6/r2m8gJrVO9Zs
-          description: Подпись ключа в формате Base64
         subject:
-          allOf:
-            - $ref: '#/components/schemas/CertificateSubject'
-            - description: Информация о владельце сертификата
+          $ref: '#/components/schemas/CertificateSubject'
         issuer:
-          allOf:
-            - $ref: '#/components/schemas/CertificateSubject'
-            - description: Информация о том кто выдал сертификат
-
-    VerifyRequest:
+          $ref: '#/components/schemas/CertificateSubject'
+    CertificateRevocationStatus:
       type: object
       properties:
-        revocationCheck:
-          type: array
-          description: Проверять ключ в OCSP/CRL на отозванность
-          items:
-            $ref: '#/components/schemas/CertificateRevocation'
-
-    ResponseStatus:
+        revoked:
+          type: boolean
+        by:
+          type: string
+          enum:
+            - OCSP
+            - CRL
+        revocationTime:
+          type: string
+          format: date-time
+        reason:
+          type: string
+    CertificateSubject:
       type: object
-      description:  Статус ответа
+      properties:
+        commonName:
+          type: string
+        lastName:
+          type: string
+        surName:
+          type: string
+        email:
+          type: string
+        organization:
+          type: string
+        gender:
+          type: string
+          enum:
+            - NONE
+            - MALE
+            - FEMALE
+        iin:
+          type: string
+        bin:
+          type: string
+        country:
+          type: string
+        locality:
+          type: string
+        state:
+          type: string
+        dn:
+          type: string
+    VerificationResponse:
+      type: object
       properties:
         status:
           type: integer
-          example: 200
-          description: Http статус
+          format: int32
         message:
           type: string
-          example: OK
-          description: Сообщение от сервера. Если произойдет ошибка, то причина ошибки будет указана здесь.
-
-    CmsData:
-      type: string
-      example: bG9sIGtlaw==
-      description: Данные для подписи. ДОЛЖНЫ быть в формате Base64.
-
-    CmsCreate:
+        valid:
+          type: boolean
+        signers:
+          type: array
+          items:
+            $ref: '#/components/schemas/CertificateInfo'
+    SignerRequest:
+      required:
+        - key
+        - password
       type: object
       properties:
-        data:
-          $ref: '#/components/schemas/CmsData'
+        key:
+          type: string
+        password:
+          type: string
+        keyAlias:
+          type: string
+        referenceUri:
+          type: string
+    XmlSignRequest:
+      required:
+        - signers
+        - xml
+      type: object
+      properties:
+        xml:
+          type: string
         signers:
-          $ref: '#/components/schemas/Signers'
+          type: array
+          items:
+            $ref: '#/components/schemas/SignerRequest'
+        clearSignatures:
+          type: boolean
+        trimXml:
+          type: boolean
+    XmlSignResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          format: int32
+        message:
+          type: string
+        xml:
+          type: string
+    SbaVerifyRequest:
+      required:
+        - certificate
+      type: object
+      properties:
+        revocationCheck:
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+            enum:
+              - OCSP
+              - CRL
+        certificate:
+          type: string
+        signature:
+          type: string
+        data:
+          type: string
+    X509InfoRequest:
+      required:
+        - certs
+      type: object
+      properties:
+        revocationCheck:
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+            enum:
+              - OCSP
+              - CRL
+        certs:
+          type: array
+          items:
+            type: string
+    WsseSignRequest:
+      required:
+        - key
+        - password
+        - xml
+      type: object
+      properties:
+        xml:
+          type: string
+        key:
+          type: string
+        password:
+          type: string
+        keyAlias:
+          type: string
+        trimXml:
+          type: boolean
+    Pkcs12InfoRequest:
+      required:
+        - keys
+      type: object
+      properties:
+        revocationCheck:
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+            enum:
+              - OCSP
+              - CRL
+        keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/SignerRequest'
+    Pkcs12AliasesResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          format: int32
+        message:
+          type: string
+        aliases:
+          type: array
+          items:
+            type: array
+            items:
+              type: string
+    PdfVerifyRequest:
+      required:
+        - pdf
+      type: object
+      properties:
+        revocationCheck:
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+            enum:
+              - OCSP
+              - CRL
+        pdf:
+          type: string
+    PdfSignerInfo:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        reason:
+          type: string
+        location:
+          type: string
+        contactInfo:
+          type: string
+        signDate:
+          type: string
+          format: date-time
+        certificate:
+          $ref: '#/components/schemas/CertificateInfo'
+        signatureAlgorithm:
+          type: string
+        digestAlgorithm:
+          type: string
+    PdfVerificationResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          format: int32
+        message:
+          type: string
+        valid:
+          type: boolean
+        signers:
+          type: array
+          items:
+            $ref: '#/components/schemas/PdfSignerInfo'
+    PdfSignRequest:
+      required:
+        - pdf
+        - signers
+      type: object
+      properties:
+        pdf:
+          type: string
+        signers:
+          type: array
+          items:
+            $ref: '#/components/schemas/PdfSigner'
         withTsp:
           type: boolean
-          default: false
-          example: true
-          description: Если true, то в CMS файл также будет добавлена TSP-метка
         tsaPolicy:
-          $ref: '#/components/schemas/TsaPolicy'
-        detached:
+          type: string
+          enum:
+            - TSA_GOST2015_POLICY
+            - TSA_GOST_POLICY
+            - TSA_GOSTGT_POLICY
+    PdfSigner:
+      required:
+        - signer
+      type: object
+      properties:
+        reason:
+          type: string
+        location:
+          type: string
+        contactInfo:
+          type: string
+        signer:
+          $ref: '#/components/schemas/SignerRequest'
+    PdfSignResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          format: int32
+        message:
+          type: string
+        pdf:
+          type: string
+    CmsVerifyRequest:
+      required:
+        - cms
+      type: object
+      properties:
+        revocationCheck:
+          uniqueItems: true
+          type: array
+          items:
+            type: string
+            enum:
+              - OCSP
+              - CRL
+        cms:
+          type: string
+        data:
+          type: string
+    CmsSignerInfo:
+      type: object
+      properties:
+        certificates:
+          type: array
+          items:
+            $ref: '#/components/schemas/CertificateInfo'
+        tsp:
+          $ref: '#/components/schemas/TspInfo'
+    CmsVerificationResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          format: int32
+        message:
+          type: string
+        valid:
           type: boolean
-          default: false
-          example: false
-          description: Если true, то CMS будет содержать открепленную подпись (т.е. внутри CMS не будет самих подписываемых данных).
-
+        signers:
+          type: array
+          items:
+            $ref: '#/components/schemas/CmsSignerInfo'
     TspInfo:
       type: object
       properties:
         serialNumber:
           type: string
-          example: ec0699173c3b3bfa785dde45248290a43c4bc288
-          description: Серийный номер
         genTime:
           type: string
-          example: 2022-09-28T16:03:41.000+00:00
-          description: Время генерации TSP метки. Можно трактовать как дату создания TSP.
+          format: date-time
         policy:
           type: string
-          example: 1.2.398.3.3.2.6.1
-          description: Политика TSP
         tsa:
           type: string
-          example: null
-          description: TSA
         tspHashAlgorithm:
           type: string
-          example: GOST3411
-          description: Алгоритм хэширования
         hash:
           type: string
-          example: 7319460cb8650ed07c4555dc5a49c2651f738f5739cfe8200c80ecd20a3bd123
-          description: Хэш
-
-    CmsSignerInfo:
+    CmsCreateRequest:
+      required:
+        - signers
       type: object
       properties:
+        cms:
+          type: string
+        data:
+          type: string
         signers:
           type: array
-          description: Информация о сертификатах
           items:
-            $ref: '#/components/schemas/CertificateInfo'
-        tsp:
-          $ref: '#/components/schemas/TspInfo'
+            $ref: '#/components/schemas/SignerRequest'
+        withTsp:
+          type: boolean
+        tsaPolicy:
+          type: string
+          enum:
+            - TSA_GOST2015_POLICY
+            - TSA_GOST_POLICY
+            - TSA_GOSTGT_POLICY
+        detached:
+          type: boolean
+    CmsResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          format: int32
+        message:
+          type: string
+        cms:
+          type: string
+    CmsDataResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          format: int32
+        message:
+          type: string
+        data:
+          type: string
+    Link:
+      type: object
+      properties:
+        href:
+          type: string
+        templated:
+          type: boolean

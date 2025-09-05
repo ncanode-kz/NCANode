@@ -6,9 +6,9 @@ import lombok.RequiredArgsConstructor;
 
 @RequiredArgsConstructor
 public enum TsaPolicy {
+    TSA_GOST2015_POLICY(KNCAObjectIdentifiers.tsa_gost2015_policy.getId()),
     TSA_GOST_POLICY(KNCAObjectIdentifiers.tsa_gost_policy.getId()),
     TSA_GOSTGT_POLICY(KNCAObjectIdentifiers.tsa_gostgt_policy.getId()),
-    TSA_GOST2015_POLICY(KNCAObjectIdentifiers.tsa_gost2015_policy.getId()),
 
     ;
 

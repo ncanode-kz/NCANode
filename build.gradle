@@ -61,6 +61,11 @@ dependencies {
     implementation 'jakarta.xml.ws:jakarta.xml.ws-api:3.0.1'
     implementation 'com.sun.xml.ws:jaxws-rt:3.0.2'
     implementation 'org.springdoc:springdoc-openapi-ui:1.8.0'
+    
+    // PDFBox for PDF signing and verification
+    implementation 'org.apache.pdfbox:pdfbox:2.0.29'
+    implementation 'org.bouncycastle:bcprov-jdk15on:1.70'
+    implementation 'org.bouncycastle:bcpkix-jdk15on:1.70'
 }
 
 test {
