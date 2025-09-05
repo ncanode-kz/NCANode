@@ -24,6 +24,8 @@ tags:
     description: Методы для работы с SOAP Wsse (SmartBridge)
   - name: CMS
     description: Методы для работы с CMS (Cryptogrphic Message Syntax)
+  - name: PDF
+    description: Методы для работы с PDF
   - name: Maintenance
     description: Методы для получении информации о состоянии сервера
 
@@ -291,6 +293,28 @@ paths:
                       
                       * `UNKOWN` - Состояние неизвестно
 
+  ### PDF ###
+  /pdf/sign:
+    post:
+      tags:
+        - PDF
+      summary: Подписывает PDF документ цифровой подписью
+      requestBody:
+        $ref: '#/components/requestBodies/PdfSignRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/PdfSignResponse'
+  /pdf/verify:
+    post:
+      tags:
+        - PDF
+      summary: Проверяет цифровые подписи в PDF документе
+      requestBody:
+        $ref: '#/components/requestBodies/PdfVerifyRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/PdfVerificationResponse'
+
 components:
   requestBodies:
     XMLVerifyRequest:
@@ -330,6 +354,57 @@ components:
               - required:
                   - cms
                   - signers
+
+    PdfSignRequest:
+      description: Запрос на подпись PDF документа
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - pdf
+              - signers
+            properties:
+              pdf:
+                type: string
+                description: PDF документ в формате Base64
+                example: 'JVBERi0xLjQKJcfsj6IKNSAwIG9iago8PAovVHlwZSAvUGFnZQovUGFyZW50IDMgMCBSCi9SZXNvdXJjZXMgPDwKL0ZvbnQgPDwKL0YxIDQgMCBSCj4+Cj4+Ci9NZWRpYUJveCBbMCAwIDU5NSA4NDJdCi9Db250ZW50cyA2IDAgUgo+PgplbmRvYmoKNiAwIG9iago8PAovTGVuZ3RoIDQ0Cj4+CnN0cmVhbQpCVApxCjcyIDAgMCA3MiAwIDAgY20KQlQKL0YxIDEyIFRmCjAgMCBUZAooSGVsbG8gV29ybGQpIFRqCkVUCmVuZHN0cmVhbQplbmRvYmoKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMyAwIFIKPj4KZW5kb2JqCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2VzCi9LaWRzIFs1IDAgUl0KL0NvdW50IDEKPD4KZW5kb2JqCjQgMCBvYmoKPDwKL1R5cGUgL0ZvbnQKL1N1YnR5cGUgL1R5cGUxCi9CYXNlRm9udCAvSGVsdmV0aWNhCj4+CmVuZG9iagoyIDAgb2JqCjw8Ci9UeXBlIC9Gb250Ci9TdWJ0eXBlIC9UeXBlMQovQmFzZUZvbnQgL0hlbHZldGljYQo+PgplbmRvYmoKeHJlZgowIDcKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNzQgMDAwMDAgbiAKMDAwMDAwMDExOSAwMDAwMCBuIAowMDAwMDAwMjQ0IDAwMDAwIG4gCjAwMDAwMDAzMTkgMDAwMDAgbiAKMDAwMDAwMDQ0NCAwMDAwMCBuIAp0cmFpbGVyCjw8Ci9TaXplIDcKL1Jvb3QgMSAwIFIKPj4Kc3RhcnR4cmVmCjU0NwolJUVPRgo='
+              signers:
+                $ref: '#/components/schemas/Signers'
+              withTsp:
+                type: boolean
+                description: Добавить временную метку TSP
+                default: false
+              tsaPolicy:
+                $ref: '#/components/schemas/TsaPolicy'
+              reason:
+                type: string
+                description: Причина подписи
+                example: 'Согласование документа'
+              location:
+                type: string
+                description: Место подписи
+                example: 'Алматы, Казахстан'
+              contactInfo:
+                type: string
+                description: Контактная информация
+                example: 'email@example.com'
+
+    PdfVerifyRequest:
+      description: Запрос на проверку PDF документа
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/VerifyRequest'
+              - properties:
+                  pdf:
+                    type: string
+                    description: PDF документ в формате Base64
+                    example: 'JVBERi0xLjQKJcfsj6IKNSAwIG9iago8PAovVHlwZSAvUGFnZQovUGFyZW50IDMgMCBSCi9SZXNvdXJjZXMgPDwKL0ZvbnQgPDwKL0YxIDQgMCBSCj4+Cj4+Ci9NZWRpYUJveCBbMCAwIDU5NSA4NDJdCi9Db250ZW50cyA2IDAgUgo+PgplbmRvYmoKNiAwIG9iago8PAovTGVuZ3RoIDQ0Cj4+CnN0cmVhbQpCVApxCjcyIDAgMCA3MiAwIDAgY20KQlQKL0YxIDEyIFRmCjAgMCBUZAooSGVsbG8gV29ybGQpIFRqCkVUCmVuZHN0cmVhbQplbmRvYmoKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMyAwIFIKPj4KZW5kb2JqCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2VzCi9LaWRzIFs1IDAgUl0KL0NvdW50IDEKPD4KZW5kb2JqCjQgMCBvYmoKPDwKL1R5cGUgL0ZvbnQKL1N1YnR5cGUgL1R5cGUxCi9CYXNlRm9udCAvSGVsdmV0aWNhCj4+CmVuZG9iagoyIDAgb2JqCjw8Ci9UeXBlIC9Gb250Ci9TdWJ0eXBlIC9UeXBlMQovQmFzZUZvbnQgL0hlbHZldGljYQo+PgplbmRvYmoKeHJlZgowIDcKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNzQgMDAwMDAgbiAKMDAwMDAwMDExOSAwMDAwMCBuIAowMDAwMDAwMjQ0IDAwMDAwIG4gCjAwMDAwMDAzMTkgMDAwMDAgbiAKMDAwMDAwMDQ0NCAwMDAwMCBuIAp0cmFpbGVyCjw8Ci9TaXplIDcKL1Jvb3QgMSAwIFIKPj4Kc3RhcnR4cmVmCjU0NwolJUVPRgo='
+              - required:
+                  - pdf
+
   responses:
     XMLSignResponse:
       description: Подписанный XML
@@ -411,6 +486,37 @@ components:
                     description: Информация о сертификатах
                     items:
                       $ref: '#/components/schemas/CmsSignerInfo'
+
+    PdfSignResponse:
+      description: Результат подписи PDF документа
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ResponseStatus'
+              - properties:
+                  pdf:
+                    type: string
+                    description: Подписанный PDF документ в формате Base64
+                    example: 'JVBERi0xLjQKJcfsj6IKNSAwIG9iago8PAovVHlwZSAvUGFnZQovUGFyZW50IDMgMCBSCi9SZXNvdXJjZXMgPDwKL0ZvbnQgPDwKL0YxIDQgMCBSCj4+Cj4+Ci9NZWRpYUJveCBbMCAwIDU5NSA4NDJdCi9Db250ZW50cyA2IDAgUgo+PgplbmRvYmoKNiAwIG9iago8PAovTGVuZ3RoIDQ0Cj4+CnN0cmVhbQpCVApxCjcyIDAgMCA3MiAwIDAgY20KQlQKL0YxIDEyIFRmCjAgMCBUZAooSGVsbG8gV29ybGQpIFRqCkVUCmVuZHN0cmVhbQplbmRvYmoKMSAwIG9iago8PAovVHlwZSAvQ2F0YWxvZwovUGFnZXMgMyAwIFIKPj4KZW5kb2JqCjMgMCBvYmoKPDwKL1R5cGUgL1BhZ2VzCi9LaWRzIFs1IDAgUl0KL0NvdW50IDEKPD4KZW5kb2JqCjQgMCBvYmoKPDwKL1R5cGUgL0ZvbnQKL1N1YnR5cGUgL1R5cGUxCi9CYXNlRm9udCAvSGVsdmV0aWNhCj4+CmVuZG9iagoyIDAgb2JqCjw8Ci9UeXBlIC9Gb250Ci9TdWJ0eXBlIC9UeXBlMQovQmFzZUZvbnQgL0hlbHZldGljYQo+PgplbmRvYmoKeHJlZgowIDcKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDA5IDAwMDAwIG4gCjAwMDAwMDAwNzQgMDAwMDAgbiAKMDAwMDAwMDExOSAwMDAwMCBuIAowMDAwMDAwMjQ0IDAwMDAwIG4gCjAwMDAwMDAzMTkgMDAwMDAgbiAKMDAwMDAwMDQ0NCAwMDAwMCBuIAp0cmFpbGVyCjw8Ci9TaXplIDcKL1Jvb3QgMSAwIFIKPj4Kc3RhcnR4cmVmCjU0NwolJUVPRgo='
+
+    PdfVerificationResponse:
+      description: Результат проверки PDF подписи
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ResponseStatus'
+              - properties:
+                  valid:
+                    type: boolean
+                    description: Общий результат проверки всех подписей
+                    example: true
+                  signers:
+                    type: array
+                    description: Информация о подписантах
+                    items:
+                      $ref: '#/components/schemas/PdfSignerInfo'
 
   schemas:
     ### COMMON ###
@@ -770,3 +876,38 @@ components:
             $ref: '#/components/schemas/CertificateInfo'
         tsp:
           $ref: '#/components/schemas/TspInfo'
+
+    PdfSignerInfo:
+      type: object
+      properties:
+        valid:
+          type: boolean
+          description: Результат проверки подписи
+          example: true
+        reason:
+          type: string
+          description: Причина подписи
+          example: 'Согласование документа'
+        location:
+          type: string
+          description: Место подписи
+          example: 'Алматы, Казахстан'
+        contactInfo:
+          type: string
+          description: Контактная информация
+          example: 'email@example.com'
+        signDate:
+          type: string
+          format: date-time
+          description: Дата и время подписи
+          example: '2023-12-01T10:30:00.000Z'
+        certificate:
+          $ref: '#/components/schemas/CertificateInfo'
+        signatureAlgorithm:
+          type: string
+          description: Алгоритм подписи
+          example: 'adbe.pkcs7.detached'
+        digestAlgorithm:
+          type: string
+          description: Алгоритм хеширования
+          example: 'SHA256'
