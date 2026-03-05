@@ -55,6 +55,9 @@ dependencies {
     implementation name: 'kalkancrypt-xmldsig-0.5'
     implementation 'org.apache.santuario:xmlsec:3.0.3'
 
+    // JWT
+    implementation name: 'java-jwt-4.4.0'
+
     // SOAP/WSSE
     implementation 'org.apache.ws.security:wss4j:1.6.19'
     implementation 'org.apache.wss4j:wss4j-ws-security-dom:2.4.1'
