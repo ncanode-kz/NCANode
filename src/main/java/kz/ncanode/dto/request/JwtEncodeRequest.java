@@ -53,11 +53,9 @@ public class JwtEncodeRequest {
         private String typ;
     }
 
-    @Builder
     @Data
     public static class JwtPayload {
-        @Builder.Default
-        private Map<String, Object> claims = new LinkedHashMap<>();
+        private final Map<String, Object> claims = new LinkedHashMap<>();
 
         @JsonAnySetter
         public void setClaim(String key, Object value) {

@@ -18,6 +18,8 @@ tags:
     description: Методы для работы с x509
   - name: XML
     description: Методы для работы с XML
+  - name: JWT
+    description: Методы для работы с JWT
   - name: Actuator
     description: Monitor and interact
     externalDocs:
@@ -276,6 +278,42 @@ paths:
             '*/*':
               schema:
                 $ref: '#/components/schemas/CmsDataResponse'
+  /jwt/encode:
+    post:
+      tags:
+        - JWT
+      operationId: encode
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JwtEncodeRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/JwtEncodeResponse'
+  /jwt/decode:
+    post:
+      tags:
+        - JWT
+      operationId: decode
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JwtDecodeRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/JwtDecodeResponse'
   /actuator:
     get:
       tags:
@@ -791,6 +829,97 @@ components:
           type: string
         data:
           type: string
+    JwtEncodeRequest:
+      required:
+        - jwt
+        - key
+        - password
+      type: object
+      properties:
+        jwt:
+          $ref: '#/components/schemas/JwtRequest'
+        key:
+          type: string
+        password:
+          type: string
+        keyAlias:
+          type: string
+    JwtRequest:
+      required:
+        - header
+        - payload
+      type: object
+      properties:
+        header:
+          $ref: '#/components/schemas/JwtHeader'
+        payload:
+          $ref: '#/components/schemas/JwtPayload'
+    JwtHeader:
+      required:
+        - alg
+        - typ
+      type: object
+      properties:
+        alg:
+          type: string
+          enum:
+            - GG2015
+            - GG2004
+            - ES256
+            - ES384
+            - ES512
+            - RS256
+            - RS384
+            - RS512
+        typ:
+          type: string
+          enum:
+            - JWT
+    JwtPayload:
+      type: object
+      example:
+        cbin: "012345678909"
+        mcheck: "DS"
+        iat: 1631925900
+        exp: 1631929500
+    JwtEncodeResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          format: int32
+        message:
+          type: string
+        jwt:
+          type: string
+    JwtDecodeRequest:
+      required:
+        - jwt
+        - key
+      type: object
+      properties:
+        jwt:
+          type: string
+        key:
+          type: string
+    JwtDecodeResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          format: int32
+        message:
+          type: string
+        jwt:
+          type: object
+          properties:
+            header:
+              type: object
+              additionalProperties:
+                type: string
+            payload:
+              type: object
+              additionalProperties: true
     Link:
       type: object
       properties:

@@ -18,7 +18,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 @Tag(name = "JWT", description = "Методы для работы с JWT")
 @RestController
-@RequestMapping("JWT")
+@RequestMapping("jwt")
 @RequiredArgsConstructor
 public class JwtController {
     private final JwtService jwtService;
