@@ -23,6 +23,9 @@ repositories {
     }
     mavenLocal()
     mavenCentral()
+    maven {
+        url 'https://pkgs.dev.azure.com/as1an/public/_packaging/repo/maven/v1'
+    }
 }
 
 dependencies {
@@ -54,6 +57,9 @@ dependencies {
     implementation name: 'knca_provider_jce_kalkan-0.7.5'
     implementation name: 'kalkancrypt-xmldsig-0.5'
     implementation 'org.apache.santuario:xmlsec:3.0.3'
+
+    // JWT GG2015
+    implementation 'kz.gov.pki:java-jwt:4.4.0'
 
     // SOAP/WSSE
     implementation 'org.apache.ws.security:wss4j:1.6.19'
