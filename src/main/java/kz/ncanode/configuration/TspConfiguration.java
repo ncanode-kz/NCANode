@@ -5,7 +5,7 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Optional;

@@ -1,4 +1,4 @@
-FROM amazoncorretto:17-alpine
+FROM amazoncorretto:25-alpine
 ENV JAVA_OPTS='-Xms128m -Xmx512m'
 EXPOSE 14579
 WORKDIR /app

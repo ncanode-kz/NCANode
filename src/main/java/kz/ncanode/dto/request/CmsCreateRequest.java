@@ -3,7 +3,7 @@ package kz.ncanode.dto.request;
 import kz.ncanode.dto.tsp.TsaPolicy;
 import lombok.Data;
 
-import javax.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotEmpty;
 import java.util.List;
 
 @Data

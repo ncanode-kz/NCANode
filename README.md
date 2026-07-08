@@ -99,8 +99,8 @@ Swagger: https://v3.ncanode.kz/swagger-ui/
 
 ### Сборка проекта
 
-Версия gradle: 7.2
-Версия java: 17
+Версия gradle: 9.6
+Версия java: 25
 
 Для сборки проекта необходимо:
 
