@@ -5,6 +5,8 @@ import kz.ncanode.constants.MessageConstants;
 import kz.ncanode.dto.certificate.CertificateInfo;
 import kz.ncanode.dto.certificate.CertificateRevocation;
 import kz.ncanode.dto.request.Pkcs12InfoRequest;
+import kz.ncanode.dto.request.SbaSignRequest;
+import kz.ncanode.dto.response.SbaSignResponse;
 import kz.ncanode.dto.response.VerificationResponse;
 import kz.ncanode.exception.ServerException;
 import kz.ncanode.wrapper.CertificateWrapper;
@@ -177,6 +179,60 @@ public class CertificateService {
     public static X509Certificate load(byte[] cert) throws CertificateException, NoSuchProviderException, IOException {
         try (ByteArrayInputStream stream = new ByteArrayInputStream(cert)) {
             return (X509Certificate)java.security.cert.CertificateFactory.getInstance("X.509", KalkanProvider.PROVIDER_NAME).generateCertificate(stream);
+        }
+    }
+
+    public SbaSignResponse create(SbaSignRequest sbaSignRequest) {
+        try {
+            String keyBase64 = sbaSignRequest.getSigner().getKey();
+            //System.out.println("keyBase64: " + keyBase64);
+
+            byte[] keyBytes = Base64.getDecoder().decode(
+                keyBase64.replaceAll("\\s", ""));
+
+            KeyStore keyStore = KeyStore.getInstance("PKCS12");
+            try (ByteArrayInputStream is = new ByteArrayInputStream(keyBytes)) {
+                keyStore.load(is, sbaSignRequest.getSigner().getPassword().toCharArray());
+            }
+
+            String alias = sbaSignRequest.getSigner().getKeyAlias();
+
+            if (alias == null || alias.isBlank()) {
+                Enumeration<String> aliases = keyStore.aliases();
+
+                while (aliases.hasMoreElements()) {
+                    String current = aliases.nextElement();
+                    if (keyStore.isKeyEntry(current)) {
+                        alias = current;
+                        break;
+                    }
+                }
+            }
+
+            if (alias == null) {
+                throw new ServerException("Private key not found in PKCS12");
+            }
+
+            PrivateKey privateKey = (PrivateKey) keyStore.getKey(
+                alias,
+                sbaSignRequest.getSigner().getPassword().toCharArray());
+
+            X509Certificate certificate =
+                (X509Certificate) keyStore.getCertificate(alias);
+
+            Signature signature = Signature.getInstance(certificate.getSigAlgName());
+
+            signature.initSign(privateKey);
+            signature.update(sbaSignRequest.getData().getBytes(StandardCharsets.UTF_8));
+
+            byte[] signBytes = signature.sign();
+
+            return SbaSignResponse.builder()
+                .certificate(Base64.getEncoder().encodeToString(certificate.getEncoded()))
+                .signature(Base64.getEncoder().encodeToString(signBytes))
+                .build();
+        } catch (Exception e) {
+            throw new ServerException(e.getMessage(), e);
         }
     }
 }
