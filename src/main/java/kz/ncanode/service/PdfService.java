@@ -103,6 +103,8 @@ public class PdfService {
 			List<PdfSignerInfo> signerInfos = new ArrayList<>();
 			boolean allValid = true;
 
+			Date currentDate = certificateService.getCurrentDate();
+
 			// Get all signatures
 			List<PDSignature> signatures = document.getSignatureDictionaries();
 
@@ -112,7 +114,7 @@ public class PdfService {
 			}
 
 			for (PDSignature signature : signatures) {
-				PdfSignerInfo signerInfo = verifySignature(signature, pdfVerifyRequest, pdfBytes);
+				PdfSignerInfo signerInfo = verifySignature(signature, pdfVerifyRequest, pdfBytes, currentDate);
 				signerInfos.add(signerInfo);
 
 				if (!signerInfo.isValid()) {
@@ -144,7 +146,8 @@ public class PdfService {
 	 */
 	private PdfSignerInfo verifySignature(PDSignature signature,
 			PdfVerifyRequest pdfVerifyRequest,
-			byte[] originalPdfBytes) {
+			byte[] originalPdfBytes,
+			Date currentDate) {
 		try {
 			// 1) Extract raw CMS (the /Contents) and the signed content (ByteRange)
 			byte[] signatureContent = signature.getContents();
@@ -196,7 +199,7 @@ public class PdfService {
 
 				certificateService.attachValidationData(certificateWrapper, withOcsp, withCrl);
 
-				boolean chainAndRevoOk = certificateWrapper.isValid(new Date(), withOcsp, withCrl);
+				boolean chainAndRevoOk = certificateWrapper.isValid(currentDate, withOcsp, withCrl);
 				if (!chainAndRevoOk) {
 					// Keep looping if multiple signer infos exist; otherwise report invalid
 					continue;
@@ -222,7 +225,7 @@ public class PdfService {
 					.signDate(signature.getSignDate() != null ? signature.getSignDate().getTime() : null)
 					.certificate(certificateWrapper != null
 							? certificateWrapper.toCertificateInfo(
-									new Date(),
+									currentDate,
 									pdfVerifyRequest.getRevocationCheck().contains(
 											kz.ncanode.dto.certificate.CertificateRevocation.OCSP),
 									pdfVerifyRequest.getRevocationCheck().contains(

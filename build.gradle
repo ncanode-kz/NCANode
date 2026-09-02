@@ -80,6 +80,9 @@ dependencies {
     implementation 'org.apache.wss4j:wss4j-ws-security-dom:2.4.1'
     implementation 'jakarta.xml.ws:jakarta.xml.ws-api:4.0.2'
     implementation 'com.sun.xml.ws:jaxws-rt:4.0.3'
+    // SAAJ-реализация (MessageFactory для WsseService); транзитивно из jaxws-rt
+    // её теряет резолвер IntelliJ — подключаем явно, версия из Spring BOM
+    implementation 'com.sun.xml.messaging.saaj:saaj-impl'
     implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6'
 
     // PDFBox for PDF signing and verification
