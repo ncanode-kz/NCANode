@@ -36,6 +36,7 @@ jobs:
         with:
           output: ./docs/_site/swagger-ui
           spec-file: openapi.yml
+          version: ^5.0.0  # swagger-ui@3 (дефолт) не рендерит OpenAPI 3.1, который отдаёт springdoc
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload artifact
