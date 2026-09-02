@@ -1,7 +1,7 @@
 package kz.ncanode.dto.request;
 
+import kz.ncanode.dto.ades.AdesLevel;
 import kz.ncanode.dto.tsp.TsaPolicy;
-import kz.ncanode.dto.xades.XadesType;
 import lombok.Builder;
 import lombok.Data;
 import lombok.extern.jackson.Jacksonized;
@@ -25,10 +25,10 @@ public class XmlSignRequest {
     private boolean trimXml = false;
 
     /**
-     * Тип подписи. {@code null} — обычный XMLDSIG (поведение по умолчанию);
-     * иначе строится XAdES соответствующего уровня.
+     * Уровень XAdES ({@code B}/{@code T}/{@code LT}/{@code LTA}). {@code null} — обычный XMLDSIG
+     * (поведение по умолчанию).
      */
-    private XadesType xadesType;
+    private AdesLevel xadesLevel;
 
     /**
      * Политика TSA для XAdES-T и выше.

@@ -8,7 +8,7 @@ import kz.ncanode.dto.request.Pkcs12InfoRequest;
 import kz.ncanode.dto.request.SbaSignRequest;
 import kz.ncanode.dto.response.SbaSignResponse;
 import kz.ncanode.dto.response.VerificationResponse;
-import kz.ncanode.dto.xades.XadesValidationData;
+import kz.ncanode.dto.ades.AdesValidationData;
 import kz.ncanode.exception.ClientException;
 import kz.ncanode.exception.ServerException;
 import kz.ncanode.wrapper.CertificateWrapper;
@@ -44,14 +44,14 @@ public class CertificateService {
     }
 
     /**
-     * Собирает материал для XAdES-LT: полную цепочку сертификатов подписанта (+ сертификаты TSA)
+     * Собирает материал для AdES-LT: полную цепочку сертификатов подписанта (+ сертификаты TSA)
      * и данные отзыва (OCSP для конечного сертификата, CRL для УЦ).
      *
      * @param signer      сертификат подписанта
      * @param extraCerts  дополнительные сертификаты (например, цепочка TSA из метки времени)
      * @return материал для вшивания
      */
-    public XadesValidationData collectXadesValidationData(CertificateWrapper signer, List<X509Certificate> extraCerts) {
+    public AdesValidationData collectAdesValidationData(CertificateWrapper signer, List<X509Certificate> extraCerts) {
         final List<CertificateWrapper> chain = caService.buildChain(signer);
         final List<X509Certificate> certificates = new ArrayList<>();
         final List<byte[]> crls = new ArrayList<>();
@@ -90,10 +90,10 @@ public class CertificateService {
             crlService.getEncodedCrlsFor(tsa).forEach(c -> addDistinct(crls, c));
         }
 
-        final XadesValidationData data = new XadesValidationData(certificates, crls, ocsps);
+        final AdesValidationData data = new AdesValidationData(certificates, crls, ocsps);
 
         if (!data.hasRevocation()) {
-            throw new ClientException("Cannot build XAdES-LT: no OCSP or CRL data available for the signer chain. "
+            throw new ClientException("Cannot build AdES-LT: no OCSP or CRL data available for the signer chain. "
                 + "Configure NCANODE_OCSP_URL / NCANODE_CRL_URL / NCANODE_CA_CRL_URL.");
         }
 

@@ -114,6 +114,9 @@ public class TspService {
      * @return список сертификатов (пустой при ошибке)
      */
     public List<X509Certificate> extractCertificates(TimeStampToken token) {
+        if (token == null) {
+            return List.of();
+        }
         try {
             CertStore store = token.getCertificatesAndCRLs("Collection", KalkanProvider.PROVIDER_NAME);
             return store.getCertificates(null).stream()

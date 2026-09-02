@@ -1,12 +1,19 @@
 package kz.ncanode.util;
 
+import kz.gov.pki.kalkan.asn1.DERSet;
+import kz.gov.pki.kalkan.asn1.cms.Attribute;
+import kz.gov.pki.kalkan.asn1.ess.ESSCertIDv2;
+import kz.gov.pki.kalkan.asn1.ess.SigningCertificateV2;
 import kz.gov.pki.kalkan.asn1.pkcs.PKCSObjectIdentifiers;
+import kz.gov.pki.kalkan.jce.provider.KalkanProvider;
 import kz.gov.pki.kalkan.jce.provider.cms.CMSSignedDataGenerator;
 import kz.gov.pki.kalkan.tsp.TSPAlgorithms;
 import lombok.experimental.UtilityClass;
 import org.apache.xml.security.encryption.XMLCipherParameters;
 import org.apache.xml.security.utils.Constants;
 
+import java.security.MessageDigest;
+import java.security.cert.X509Certificate;
 import java.util.HashMap;
 
 /**
@@ -116,6 +123,34 @@ public class KalkanUtil {
             return TSPAlgorithms.SHA1;
         } else {
             return TSPAlgorithms.GOST34311;
+        }
+    }
+
+    /**
+     * OID алгоритма хэширования message imprint для метки времени под политику TSA.
+     *
+     * @param tsaPolicyOid OID политики TSA
+     * @return OID алгоритма хэширования
+     */
+    public static String getTspImprintDigestForPolicy(String tsaPolicyOid) {
+        if ("1.2.398.3.3.2.6.4".equals(tsaPolicyOid)) { // tsa_gost2015_policy
+            return "1.2.398.3.10.1.3.3"; // gost3411-2015-512
+        }
+        return TSPAlgorithms.GOST34311; // gost34311-95
+    }
+
+    /**
+     * Обязательный signed-атрибут CAdES/PAdES-B: {@code id-aa-signingCertificateV2}
+     * (ESSCertIDv2 с SHA-256 хэшем сертификата).
+     */
+    public static Attribute signingCertificateV2Attribute(X509Certificate certificate) {
+        try {
+            byte[] certHash = MessageDigest.getInstance("SHA-256", KalkanProvider.PROVIDER_NAME)
+                .digest(certificate.getEncoded());
+            return new Attribute(PKCSObjectIdentifiers.id_aa_signingCertificateV2,
+                new DERSet(new SigningCertificateV2(new ESSCertIDv2[]{new ESSCertIDv2(null, certHash)})));
+        } catch (Exception e) {
+            throw new IllegalStateException("Cannot build signingCertificateV2 attribute", e);
         }
     }
 

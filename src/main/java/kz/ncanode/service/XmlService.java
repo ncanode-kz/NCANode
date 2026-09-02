@@ -5,8 +5,8 @@ import kz.ncanode.dto.request.SignerRequest;
 import kz.ncanode.dto.request.XmlSignRequest;
 import kz.ncanode.dto.response.VerificationResponse;
 import kz.ncanode.dto.response.XmlSignResponse;
+import kz.ncanode.dto.ades.AdesLevel;
 import kz.ncanode.dto.tsp.TsaPolicy;
-import kz.ncanode.dto.xades.XadesType;
 import kz.ncanode.exception.ClientException;
 import kz.ncanode.exception.ServerException;
 import kz.ncanode.util.KalkanUtil;
@@ -81,11 +81,11 @@ public class XmlService {
         for (KeyStoreWrapper keyStore : kalkanWrapper.read(xmlSignRequest.getSigners())) {
             final SignerRequest signer = xmlSignRequest.getSigners().get(i++);
 
-            if (xmlSignRequest.getXadesType() == null) {
+            if (xmlSignRequest.getXadesLevel() == null) {
                 document.createXmlSignature(keyStore.getCertificate(), signer.getReferenceUri())
                     .sign(keyStore.getPrivateKey());
             } else {
-                signXades(document, keyStore, signer, xmlSignRequest.getXadesType(), xmlSignRequest.getTsaPolicy());
+                signXades(document, keyStore, signer, xmlSignRequest.getXadesLevel(), xmlSignRequest.getTsaPolicy());
             }
         }
 
@@ -95,10 +95,10 @@ public class XmlService {
     }
 
     /**
-     * Подписывает документ по профилю XAdES: BES → T → LT → LTA (каждый следующий включает предыдущий).
+     * Подписывает документ по профилю XAdES: B → T → LT → LTA (каждый следующий включает предыдущий).
      */
     private void signXades(DocumentWrapper document, KeyStoreWrapper keyStore, SignerRequest signer,
-                           XadesType xadesType, TsaPolicy tsaPolicy) {
+                           AdesLevel level, TsaPolicy tsaPolicy) {
         final CertificateWrapper certificate = keyStore.getCertificate();
         final String imprintDigest = KalkanUtil.getXadesTspImprintDigest(
             certificate.getX509Certificate().getSigAlgOID());
@@ -106,7 +106,7 @@ public class XmlService {
         final XadesSignatureWrapper xades = new XadesSignatureWrapper(document, certificate, signer.getReferenceUri());
         xades.sign(keyStore.getPrivateKey());
 
-        if (xadesType == XadesType.XADES_BES) {
+        if (level == AdesLevel.B) {
             return;
         }
 
@@ -115,16 +115,16 @@ public class XmlService {
             xades.getCanonicalizedSignatureValue(), imprintDigest, tsaPolicy.getPolicyId());
         xades.attachSignatureTimeStamp(encoded(signatureTimeStamp));
 
-        if (xadesType == XadesType.XADES_T) {
+        if (level == AdesLevel.T) {
             return;
         }
 
         // XAdES-LT: вшиваем цепочку и данные отзыва
-        final var validationData = certificateService.collectXadesValidationData(
+        final var validationData = certificateService.collectAdesValidationData(
             certificate, tspService.extractCertificates(signatureTimeStamp));
         xades.attachValidationData(validationData.certificates(), validationData.crls(), validationData.ocsps());
 
-        if (xadesType == XadesType.XADES_LT) {
+        if (level == AdesLevel.LT) {
             return;
         }
 

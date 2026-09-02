@@ -57,18 +57,38 @@ GOST-2015 (действующий на 2026–2027):
 
 Задача: выдавать не голый xmldsig/CMS-with-TSP, а профили ETSI **B / T / LT / LTA** (клиентский запрос про «профили A, B, LT, LTA и XAdES»).
 
-**Статус реализации:**
-- XAdES **BES / T / LT / LTA** для `/xml/sign` — готово. `XmlSignRequest.xadesType`
-  (`XADES_BES`/`XADES_T`/`XADES_LT`/`XADES_LTA`, `null` = обычный XMLDSIG) + `tsaPolicy`.
-  Оркестрация — `XmlService.signXades` (каждый уровень включает предыдущий):
-  - BES/T/архивная метка — `wrapper/XadesSignatureWrapper` (Santuario + Kalkan), TSP через `TspService`.
-  - LT-материал — `CertificateService.collectXadesValidationData`: цепочка через `CaService.buildChain`,
-    OCSP-в-DER через `OcspService.getRawResponses`, CRL-в-DER через `CrlService.getEncodedCrlsFor`,
-    сертификаты TSA через `TspService.extractCertificates`.
-  - Имприт `xades141:ArchiveTimeStamp` — `XadesSignatureWrapper.getArchiveTimeStampImprintData` (порядок 1:1 с движком NCALayer).
-  Все 4 уровня из NCANode проходят `ValidationReport[VALID]` в движке NCALayer (`VerifyXades.java` в `scratchpad/ltref`).
-  Если нет ни OCSP, ни CRL для цепочки — LT/LTA отдаёт `ClientException`.
-- CAdES / PAdES уровней T/LT/LTA — не начато.
+**Статус реализации.** Общий enum уровня — `dto/ades/AdesLevel { B, T, LT, LTA }`.
+Сбор LT-материала — `CertificateService.collectAdesValidationData(signer, extraCerts)`
+→ `dto/ades/AdesValidationData` (цепочка через `CaService.buildChain`, OCSP-в-DER через
+`OcspService.getRawResponses`, CRL-в-DER через `CrlService.getEncodedCrlsFor`, сертификаты TSA
+через `TspService.extractCertificates`). Формат-нейтрально. Нет OCSP/CRL для цепочки → `ClientException`.
+
+- **XAdES B/T/LT/LTA** — `/xml/sign`, `XmlSignRequest.xadesLevel` (`null` = обычный XMLDSIG) + `tsaPolicy`.
+  Оркестрация `XmlService.signXades`, формат — `wrapper/XadesSignatureWrapper` (Santuario + Kalkan).
+- **CAdES B/T/LT/LTA** — `/cms/sign`, `CmsCreateRequest.cadesLevel` (`null` = обычный CMS + флаг `withTsp`).
+  На `/cms/sign/add` (co-sign) — не поддержано, `ClientException`.
+  Оркестрация `CmsService.applyCadesLevel`, формат — `wrapper/CadesSignatureWrapper`:
+  - B — signed-атрибут `id-aa-signingCertificateV2` (ESSCertIDv2, SHA-256) + `signingTime`
+    (в `CmsService.cadesSignedAttributes`, через 5-арг `addSigner`).
+  - T — `TspService.addTspToSigner` (`id-aa-signatureTimeStampToken`).
+  - LT — цепочка в `SignedData.certificates` (`replaceCertificatesAndCRLs`), отзыв в `SignedData.crls`
+    (`CertificateList` / `[1] OtherRevocationInfoFormat` c `id-ri-ocsp-response`).
+  - LTA — `id-aa-ets-archiveTimestampV3` (`0.4.0.1733.2.4`) + `id-aa-ATSHashIndex-v3` (`0.4.0.19122.1.5`)
+    внутри токена; имприт по ETSI EN 319 122-1 §5.5.3 (порядок 1:1 с движком NCALayer).
+    ponytail: для detached-CMS архивный имприт хэширует пустое содержимое (как и движок NCALayer).
+
+- **PAdES B/T/LT/LTA** — `/pdf/sign`, `PdfSignRequest.padesLevel` (`null` = обычная подпись + флаг `withTsp`).
+  Оркестрация `PdfService.sign`:
+  - B — signed-атрибут `id-aa-signingCertificateV2` в CMS (`PdfSignatureInterface`, 5-арг `addSigner`).
+  - T — `TspService.addTspToSigner` в CMS.
+  - LT — `PdfService.addDocumentSecurityStore` + `wrapper/PadesLtvBuilder`: словарь `/DSS`
+    (`/Certs`, `/CRLs`, `/OCSPs` как COSStream) + `/VRI/<hex SHA-1 CMS-байтов подписи>`, `saveIncremental`.
+  - LTA — LT, затем ревизия с `/DocTimeStamp` (`/SubFilter /ETSI.RFC3161`, RFC3161-токен над ByteRange),
+    затем повторный `/DSS` (цепочка TSA).
+
+  Все 4 уровня XAdES, CAdES и PAdES из NCANode проходят `ValidationReport[VALID]` в движке NCALayer
+  (`scratchpad/ltref/VerifyXades.java`, `VerifyCades.java`, `VerifyPades.java`).
+- **JAdES** — не начато (нет референса NCALayer, см. PLAN.md Фаза 3).
 
 Референс — движок `kz.gov.pki.ades` из NCALayer (`knca_provider_util 0.9`, бандл `bundle23`), декомпилированный в `scratchpad` сессии. Ключевые факты:
 
@@ -83,11 +103,14 @@ GOST-2015 (действующий на 2026–2027):
 - `CertificateValues` = подписант + промежуточный + корневой (+ сертификаты TSA).
 - LTA = LT + `xades141:ArchiveTimeStamp` (собственный `xmlns:xades141`).
 
-Эталоны: `src/test/resources/xades/xades-test-signed-{b,t,lt,lta}.xml` (+ исходник `xades-test.xml`).
-`XadesFixtureSpec` проверяет их валидность на **фиксированную** дату `2026-09-02T11:00:00Z`
-(= 2026-09-02 16:00 UTC+5): крипто-подпись, `CertDigest`, срок действия сертификата, метка времени
-(imprint над c14n `ds:SignatureValue`), актуальность вшитых CRL, наличие архивной метки для LTA.
-Дата фиксирована намеренно — «валидно на `new Date()`» протухнет с истечением сертификата/CRL.
+Эталоны на фиксированную дату `2026-09-02T11:00:00Z` (= 2026-09-02 16:00 UTC+5), проверяют
+крипто-подпись, `SigningCertificateV2`-хэш, срок действия сертификата, imprint метки времени,
+вшитый отзыв (LT/LTA), архивную метку (LTA). Дата фиксирована намеренно — «валидно на `new Date()`»
+протухнет с истечением сертификата/CRL. Метки времени проверяются на попадание в срок действия
+сертификата (а не «до REFERENCE_DATE») — устойчиво к перегенерации фикстур.
+- XAdES: `src/test/resources/xades/xades-test-signed-{b,t,lt,lta}.xml` (+ `xades-test.xml`), `XadesFixtureSpec`.
+- CAdES: `src/test/resources/cades/cades-test-signed-{b,t,lt,lta}.p7s` (+ `cades-test.bin`), `CadesFixtureSpec`.
+  (B/T подписаны пользователем; LT/LTA сгенерены `scratchpad/ltref/GenCades.java` движком NCALayer.)
 
 Кросс-проверка: `scratchpad`-сессии, `ltref/` — `GenXades.java` генерирует эталоны прогоном движка
 NCALayer `kz.gov.pki.ades` напрямую (бандлы `kalkan`/`ades`/`xmldsig` + `StaticCrlSource`/`OnlineOcspSource`,

@@ -1,11 +1,19 @@
 package kz.ncanode.service;
 
+import kz.gov.pki.kalkan.asn1.DERObjectIdentifier;
+import kz.gov.pki.kalkan.asn1.DERSet;
 import kz.gov.pki.kalkan.asn1.cms.Attribute;
+import kz.gov.pki.kalkan.asn1.cms.AttributeTable;
+import kz.gov.pki.kalkan.asn1.cms.CMSAttributes;
+import kz.gov.pki.kalkan.asn1.cms.Time;
 import kz.gov.pki.kalkan.asn1.pkcs.PKCSObjectIdentifiers;
 import kz.gov.pki.kalkan.jce.provider.KalkanProvider;
 import kz.gov.pki.kalkan.jce.provider.cms.*;
+import kz.gov.pki.kalkan.tsp.TimeStampToken;
 import kz.gov.pki.kalkan.tsp.TimeStampTokenInfo;
 import kz.gov.pki.kalkan.util.encoders.Hex;
+import kz.ncanode.dto.ades.AdesLevel;
+import kz.ncanode.dto.ades.AdesValidationData;
 import kz.ncanode.dto.cms.CmsSignerInfo;
 import kz.ncanode.dto.request.CmsCreateRequest;
 import kz.ncanode.dto.request.SignerRequest;
@@ -18,6 +26,7 @@ import kz.ncanode.exception.ClientException;
 import kz.ncanode.exception.ServerException;
 import kz.ncanode.util.KalkanUtil;
 import kz.ncanode.util.Util;
+import kz.ncanode.wrapper.CadesSignatureWrapper;
 import kz.ncanode.wrapper.CertificateWrapper;
 import kz.ncanode.wrapper.KalkanWrapper;
 import kz.ncanode.wrapper.KeyStoreWrapper;
@@ -59,7 +68,8 @@ public class CmsService {
             CMSProcessable cmsData = new CMSProcessableByteArray(data);
             List<X509Certificate> certificates = new ArrayList<>();
 
-            addSignersToCmsGenerator(generator, data, certificates, cmsCreateRequest.getSigners());
+            addSignersToCmsGenerator(generator, data, certificates, cmsCreateRequest.getSigners(),
+                cmsCreateRequest.getCadesLevel() != null);
 
             CertStore chainStore = CertStore.getInstance(
                 "Collection",
@@ -73,6 +83,15 @@ public class CmsService {
 
             generator.addCertificatesAndCRLs(chainStore);
             CMSSignedData signed = generator.generate(cmsData, !cmsCreateRequest.isDetached(), KalkanProvider.PROVIDER_NAME);
+
+            if (cmsCreateRequest.getCadesLevel() != null) {
+                signed = applyCadesLevel(signed, certificates, cmsCreateRequest.getCadesLevel(),
+                    tsaPolicyId(cmsCreateRequest.getTsaPolicy()));
+
+                return CmsResponse.builder()
+                    .cms(Base64.getEncoder().encodeToString(signed.getEncoded()))
+                    .build();
+            }
 
             // TSP
             if (cmsCreateRequest.isWithTsp()) {
@@ -95,6 +114,8 @@ public class CmsService {
             return CmsResponse.builder()
                 .cms(Base64.getEncoder().encodeToString(signed.getEncoded()))
                 .build();
+        } catch (ClientException e) {
+            throw e;
         } catch (Exception e) {
             throw new ServerException(e.getMessage(), e);
         }
@@ -110,6 +131,10 @@ public class CmsService {
         try {
             if (cmsCreateRequest.getCms() == null || cmsCreateRequest.getCms().isEmpty()) {
                 throw new ClientException("CMS argument not specified");
+            }
+
+            if (cmsCreateRequest.getCadesLevel() != null) {
+                throw new ClientException("CAdES profile (cadesLevel) is only supported for a fresh signature on /cms/sign");
             }
 
             val decodedCms = Base64.getDecoder().decode(cmsCreateRequest.getCms());
@@ -139,7 +164,7 @@ public class CmsService {
 
             val certificates = getCertificatesFromCmsSignedData(cms);
 
-            addSignersToCmsGenerator(generator, decodedData, certificates, cmsCreateRequest.getSigners());
+            addSignersToCmsGenerator(generator, decodedData, certificates, cmsCreateRequest.getSigners(), false);
 
             CertStore chainStore = CertStore.getInstance(
                 "Collection",
@@ -181,6 +206,8 @@ public class CmsService {
             return CmsResponse.builder()
                 .cms(Base64.getEncoder().encodeToString(signed.getEncoded()))
                 .build();
+        } catch (ClientException e) {
+            throw e;
         } catch (Exception e) {
             throw new ServerException(e.getMessage(), e);
         }
@@ -345,7 +372,7 @@ public class CmsService {
         return certs;
     }
 
-    private void addSignersToCmsGenerator(CMSSignedDataGenerator generator, byte[] decodedData, List<X509Certificate> certificates, List<SignerRequest> signers) {
+    private void addSignersToCmsGenerator(CMSSignedDataGenerator generator, byte[] decodedData, List<X509Certificate> certificates, List<SignerRequest> signers, boolean cades) {
         try {
             for (KeyStoreWrapper ks : kalkanWrapper.read(signers)) {
                 CertificateWrapper cert = ks.getCertificate();
@@ -355,11 +382,152 @@ public class CmsService {
                 sig.initSign(privateKey);
                 sig.update(decodedData);
 
-                generator.addSigner(privateKey, cert.getX509Certificate(), Util.getDigestAlgorithmOidBYSignAlgorithmOid(cert.getX509Certificate().getSigAlgOID()));
+                String digestOid = Util.getDigestAlgorithmOidBYSignAlgorithmOid(cert.getX509Certificate().getSigAlgOID());
+
+                if (cades) {
+                    generator.addSigner(privateKey, cert.getX509Certificate(), digestOid,
+                        cadesSignedAttributes(cert.getX509Certificate()), null);
+                } else {
+                    generator.addSigner(privateKey, cert.getX509Certificate(), digestOid);
+                }
+
                 certificates.add(cert.getX509Certificate());
             }
+        } catch (ClientException e) {
+            throw e;
         } catch (Exception e) {
             throw new ServerException(e.getMessage(), e);
         }
+    }
+
+    /**
+     * Обязательный signed-атрибут CAdES-B: {@code id-aa-signingCertificateV2} (ESSCertIDv2, SHA-256
+     * хэш сертификата) + {@code signingTime}.
+     *
+     * ponytail: {@code id-aa-CMS-algorithm-protection} пока не добавляем — не обязателен для baseline-B,
+     * добавить если потребуется защита от подмены алгоритма.
+     */
+    private AttributeTable cadesSignedAttributes(X509Certificate certificate) {
+        Attribute signingCertificate = KalkanUtil.signingCertificateV2Attribute(certificate);
+        Attribute signingTime = new Attribute(CMSAttributes.signingTime, new DERSet(new Time(new Date())));
+
+        Hashtable<DERObjectIdentifier, Attribute> table = new Hashtable<>();
+        table.put(signingCertificate.getAttrType(), signingCertificate);
+        table.put(signingTime.getAttrType(), signingTime);
+
+        return new AttributeTable(table);
+    }
+
+    private static String tsaPolicyId(TsaPolicy policy) {
+        return Optional.ofNullable(policy).map(TsaPolicy::getPolicyId)
+            .orElse(TsaPolicy.TSA_GOST2015_POLICY.getPolicyId());
+    }
+
+    /**
+     * Достраивает CMS до профиля CAdES: B → T → LT → LTA (каждый следующий включает предыдущий).
+     *
+     * @param signed       базовый CMS (уровень B)
+     * @param signerCerts  сертификаты подписантов в порядке следования {@code SignerInfos}
+     * @param level        целевой уровень
+     * @param tsaPolicyId  OID политики TSA
+     */
+    private CMSSignedData applyCadesLevel(CMSSignedData signed, List<X509Certificate> signerCerts,
+                                          AdesLevel level, String tsaPolicyId) throws Exception {
+        if (level == AdesLevel.B) {
+            return signed;
+        }
+
+        // T: метка времени каждому подписанту без неё
+        List<SignerInformation> timestamped = new ArrayList<>();
+        List<SignerInformation> signers = new ArrayList<>(signed.getSignerInfos().getSigners());
+
+        for (int i = 0; i < signers.size(); i++) {
+            SignerInformation signer = signers.get(i);
+            timestamped.add(extractSignatureTimeStamp(signer) != null
+                ? signer
+                : tspService.addTspToSigner(signer, signerCerts.get(i), tsaPolicyId));
+        }
+
+        signed = CMSSignedData.replaceSigners(signed, new SignerInformationStore(timestamped));
+
+        if (level == AdesLevel.T) {
+            return signed;
+        }
+
+        // LT: цепочки и данные отзыва
+        CadesSignatureWrapper cades = new CadesSignatureWrapper(signed);
+        List<SignerInformation> current = cades.signers();
+
+        List<X509Certificate> allCerts = new ArrayList<>();
+        List<byte[]> crls = new ArrayList<>();
+        List<byte[]> ocsps = new ArrayList<>();
+
+        signerCerts.forEach(c -> addDistinct(allCerts, c));
+
+        for (int i = 0; i < signerCerts.size(); i++) {
+            TimeStampToken token = extractSignatureTimeStamp(current.get(i));
+            AdesValidationData data = certificateService.collectAdesValidationData(
+                new CertificateWrapper(signerCerts.get(i)),
+                token != null ? tspService.extractCertificates(token) : List.of());
+
+            data.certificates().forEach(c -> addDistinct(allCerts, c));
+            data.crls().forEach(c -> addDistinct(crls, c));
+            data.ocsps().forEach(o -> addDistinct(ocsps, o));
+        }
+
+        cades.embedValidationData(allCerts, crls, ocsps);
+
+        if (level == AdesLevel.LT) {
+            return cades.getCms();
+        }
+
+        // LTA: архивная метка времени
+        cades = new CadesSignatureWrapper(cades.getCms());
+        String archiveDigestOid = KalkanUtil.getXadesTspImprintDigest(signerCerts.get(0).getSigAlgOID());
+        cades.addArchiveTimestamps(archiveDigestOid, (imprintData, digestOid) -> {
+            try {
+                return tspService.create(imprintData, digestOid, tsaPolicyId).getEncoded();
+            } catch (IOException e) {
+                throw new ServerException("Archive timestamp token encoding error", e);
+            }
+        });
+
+        return cades.getCms();
+    }
+
+    private static TimeStampToken extractSignatureTimeStamp(SignerInformation signer) {
+        if (signer.getUnsignedAttributes() == null) {
+            return null;
+        }
+        Attribute attribute = signer.getUnsignedAttributes().get(PKCSObjectIdentifiers.id_aa_signatureTimeStampToken);
+        if (attribute == null) {
+            return null;
+        }
+        try {
+            return new TimeStampToken(new CMSSignedData(
+                attribute.getAttrValues().getObjectAt(0).getDERObject().getEncoded()));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static void addDistinct(List<byte[]> list, byte[] value) {
+        if (list.stream().noneMatch(existing -> Arrays.equals(existing, value))) {
+            list.add(value);
+        }
+    }
+
+    private static void addDistinct(List<X509Certificate> list, X509Certificate value) {
+        try {
+            byte[] encoded = value.getEncoded();
+            for (X509Certificate existing : list) {
+                if (Arrays.equals(existing.getEncoded(), encoded)) {
+                    return;
+                }
+            }
+        } catch (CertificateEncodingException ignored) {
+            // добавим как есть
+        }
+        list.add(value);
     }
 }

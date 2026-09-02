@@ -5,8 +5,8 @@ import kz.gov.pki.kalkan.jce.provider.cms.CMSSignedData
 import kz.gov.pki.kalkan.tsp.TimeStampToken
 import kz.ncanode.common.WithTestData
 import kz.ncanode.dto.request.XmlSignRequest
-import kz.ncanode.dto.xades.XadesType
-import kz.ncanode.dto.xades.XadesValidationData
+import kz.ncanode.dto.ades.AdesLevel
+import kz.ncanode.dto.ades.AdesValidationData
 import kz.ncanode.service.CertificateService
 import kz.ncanode.service.TspService
 import kz.ncanode.service.XmlService
@@ -45,7 +45,7 @@ class XadesServiceTest extends Specification implements WithTestData {
     @Unroll("#caseName")
     def "sign XAdES-BES"() {
         given:
-        def request = XmlSignRequest.builder().xml(XML).xadesType(XadesType.XADES_BES).signers([signer]).build()
+        def request = XmlSignRequest.builder().xml(XML).xadesLevel(AdesLevel.B).signers([signer]).build()
 
         when:
         def signed = parse(xmlService.sign(request).xml)
@@ -89,7 +89,7 @@ class XadesServiceTest extends Specification implements WithTestData {
         given:
         stubTimestamp()
 
-        def request = XmlSignRequest.builder().xml(XML).xadesType(XadesType.XADES_T)
+        def request = XmlSignRequest.builder().xml(XML).xadesLevel(AdesLevel.T)
             .signers([SIGNER_REQUEST_VALID_2015()]).build()
 
         when:
@@ -110,9 +110,9 @@ class XadesServiceTest extends Specification implements WithTestData {
     def "sign XAdES-LT embeds certificate and revocation values"() {
         given:
         stubTimestamp()
-        when(certificateService.collectXadesValidationData(any(), any())).thenReturn(sampleValidationData())
+        when(certificateService.collectAdesValidationData(any(), any())).thenReturn(sampleValidationData())
 
-        def request = XmlSignRequest.builder().xml(XML).xadesType(XadesType.XADES_LT)
+        def request = XmlSignRequest.builder().xml(XML).xadesLevel(AdesLevel.LT)
             .signers([SIGNER_REQUEST_VALID_2015()]).build()
 
         when:
@@ -133,9 +133,9 @@ class XadesServiceTest extends Specification implements WithTestData {
     def "sign XAdES-LTA adds an archive timestamp"() {
         given:
         stubTimestamp()
-        when(certificateService.collectXadesValidationData(any(), any())).thenReturn(sampleValidationData())
+        when(certificateService.collectAdesValidationData(any(), any())).thenReturn(sampleValidationData())
 
-        def request = XmlSignRequest.builder().xml(XML).xadesType(XadesType.XADES_LTA)
+        def request = XmlSignRequest.builder().xml(XML).xadesLevel(AdesLevel.LTA)
             .signers([SIGNER_REQUEST_VALID_2015()]).build()
 
         when:
@@ -159,13 +159,13 @@ class XadesServiceTest extends Specification implements WithTestData {
         when(tspService.extractCertificates(any())).thenReturn([])
     }
 
-    private static XadesValidationData sampleValidationData() {
+    private static AdesValidationData sampleValidationData() {
         def cf = CertificateFactory.getInstance('X.509')
         def cert = cf.generateCertificate(
             new FileInputStream(ResourceUtils.getFile('classpath:ca/nca_gost2015_test.cer')))
         def crl = ResourceUtils.getFile('classpath:crl/nca_gost2022_test.crl').bytes
         def ocsp = ResourceUtils.getFile('classpath:ocsp/ocsp_response_individual_2015.bin').bytes
-        new XadesValidationData([cert] as List, [crl] as List, [ocsp] as List)
+        new AdesValidationData([cert] as List, [crl] as List, [ocsp] as List)
     }
 
     private static org.w3c.dom.Document parse(String xml) {
