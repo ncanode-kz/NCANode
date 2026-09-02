@@ -3,6 +3,8 @@ package kz.ncanode.controller;
 import kz.ncanode.dto.certificate.CertificateRevocation;
 import kz.ncanode.dto.request.SbaVerifyRequest;
 import kz.ncanode.dto.request.X509InfoRequest;
+import kz.ncanode.dto.response.SbaSignResponse;
+import kz.ncanode.dto.request.SbaSignRequest;
 import kz.ncanode.dto.response.VerificationResponse;
 import kz.ncanode.service.CertificateService;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +24,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @RequiredArgsConstructor
 public class X509Controller {
     private final CertificateService certificateService;
+
+    @PostMapping("/sign")
+    public ResponseEntity<SbaSignResponse> sign(@Valid @RequestBody SbaSignRequest sbaSignRequest) {
+        return ResponseEntity.ok(certificateService.create(sbaSignRequest));
+    }
 
     @PostMapping("/info")
     public ResponseEntity<VerificationResponse> verify(@Valid @RequestBody X509InfoRequest x509InfoRequest) {
