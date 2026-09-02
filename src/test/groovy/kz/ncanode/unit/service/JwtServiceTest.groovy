@@ -215,6 +215,45 @@ class JwtServiceTest extends Specification implements WithTestData {
         decodeResponse.jwt.payload.get("roles") == ["admin", "user"]
     }
 
+    def "test jwt encode handles all claim value types"() {
+        given:
+        def payload = new JwtEncodeRequest.JwtPayload()
+        payload.setClaim("str", "s")
+        payload.setClaim("int", 7 as Integer)
+        payload.setClaim("long", 9_000_000_000L)
+        payload.setClaim("double", 1.5d)
+        payload.setClaim("bool", true)
+        payload.setClaim("date", new Date(0))
+        payload.setClaim("map", [a: 1])
+        payload.setClaim("list", [1, 2])
+        payload.setClaim("nullv", null)
+        payload.setClaim("other", new BigInteger("42")) // -> toString() fallback
+
+        def header = JwtEncodeRequest.JwtHeader.builder().alg("GG2015").typ("JWT").build()
+        def jwtRequest = JwtEncodeRequest.JwtRequest.builder().header(header).payload(payload).build()
+
+        when:
+        def response = jwtService.encode(JwtEncodeRequest.builder()
+            .jwt(jwtRequest)
+            .key(KEY_INDIVIDUAL_VALID_2015)
+            .password(KEY_INDIVIDUAL_VALID_2015_PASSWORD)
+            .build())
+
+        then:
+        response.jwt.split('\\.').length == 3
+    }
+
+    def "test jwt decode with malformed base64 key throws ClientException"() {
+        when:
+        jwtService.decode(JwtDecodeRequest.builder()
+            .jwt("a.b.c")
+            .key("!!!not-base64!!!")
+            .build())
+
+        then:
+        thrown(ClientException)
+    }
+
     def "test jwt encode with multiple claims preserves all claims"() {
         given:
         def payload = new JwtEncodeRequest.JwtPayload()

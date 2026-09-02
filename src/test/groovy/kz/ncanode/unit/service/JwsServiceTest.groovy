@@ -199,9 +199,148 @@ class JwsServiceTest extends Specification implements WithTestData {
         !verifyResponse.signers.get(0).valid
     }
 
+    private ObjectNode flatten(ObjectNode jws) {
+        def sig0 = jws.get("signatures").get(0)
+        def flat = mapper.createObjectNode()
+        flat.put("payload", jws.get("payload").asText())
+        flat.set("protected", sig0.get("protected"))
+        flat.set("signature", sig0.get("signature"))
+        return flat
+    }
+
+    def "verify accepts flattened (single-signature) JWS"() {
+        given:
+        def signed = jwsService.sign(JwsSignRequest.builder()
+            .payload(mapper.valueToTree([flat: true]))
+            .signers([signer2015()])
+            .build())
+
+        when:
+        def verifyResponse = jwsService.verify(JwsVerifyRequest.builder()
+            .jws(flatten(signed.jws as ObjectNode))
+            .build())
+
+        then:
+        verifyResponse.valid
+        verifyResponse.signers.size() == 1
+    }
+
+    def "sign/add normalizes a flattened JWS before appending"() {
+        given:
+        def signed = jwsService.sign(JwsSignRequest.builder()
+            .payload(mapper.valueToTree([flat: true]))
+            .signers([signer2015()])
+            .build())
+
+        when:
+        def result = jwsService.addSigners(JwsSignRequest.builder()
+            .jws(flatten(signed.jws as ObjectNode))
+            .signers([signerRsa()])
+            .build())
+
+        then:
+        result.jws.get("signatures").size() == 2
+        jwsService.verify(JwsVerifyRequest.builder().jws(result.jws).build()).valid
+    }
+
+    def "verify fails when protected header has no x5c"() {
+        given:
+        def signed = jwsService.sign(JwsSignRequest.builder()
+            .payload(mapper.valueToTree([a: 1]))
+            .signers([signer2015()])
+            .build())
+
+        and: 'strip x5c from the protected header'
+        def tampered = signed.jws.deepCopy() as ObjectNode
+        def sig0 = tampered.get("signatures").get(0) as ObjectNode
+        def header = mapper.readTree(Base64.urlDecoder.decode(sig0.get("protected").asText())) as ObjectNode
+        header.remove("x5c")
+        sig0.put("protected", Base64.urlEncoder.withoutPadding().encodeToString(mapper.writeValueAsBytes(header)))
+
+        when:
+        jwsService.verify(JwsVerifyRequest.builder().jws(tampered).build())
+
+        then:
+        thrown(ClientException)
+    }
+
+    def "verify with revocation check and no validation data marks signer invalid"() {
+        given:
+        def signed = jwsService.sign(JwsSignRequest.builder()
+            .payload(mapper.valueToTree([a: 1]))
+            .signers([signer2015()])
+            .build())
+
+        when:
+        def verifyResponse = jwsService.verify(JwsVerifyRequest.builder()
+            .jws(signed.jws)
+            .revocationCheck([kz.ncanode.dto.certificate.CertificateRevocation.OCSP] as Set)
+            .build())
+
+        then:
+        !verifyResponse.valid
+        !verifyResponse.signers.get(0).valid
+    }
+
     def "verify with malformed jws throws ClientException"() {
         when:
         jwsService.verify(JwsVerifyRequest.builder().jws(mapper.valueToTree([foo: "bar"])).build())
+
+        then:
+        thrown(ClientException)
+    }
+
+    def "sign without payload throws ClientException"() {
+        when:
+        jwsService.sign(JwsSignRequest.builder().signers([signer2015()]).build())
+
+        then:
+        thrown(ClientException)
+    }
+
+    def "sign with wrong key password throws ClientException"() {
+        when:
+        jwsService.sign(JwsSignRequest.builder()
+            .payload(mapper.valueToTree([a: 1]))
+            .signers([JwsSignerRequest.builder()
+                .alg("GG2015")
+                .key(KEY_INDIVIDUAL_VALID_2015)
+                .password("wrong-password")
+                .build()])
+            .build())
+
+        then:
+        thrown(ClientException)
+    }
+
+    def "sign/add without jws throws ClientException"() {
+        when:
+        jwsService.addSigners(JwsSignRequest.builder().signers([signer2015()]).build())
+
+        then:
+        thrown(ClientException)
+    }
+
+    def "sign/add on detached JWS without payload throws ClientException"() {
+        given:
+        def signed = jwsService.sign(JwsSignRequest.builder()
+            .payload(mapper.valueToTree([a: 1])).detached(true).signers([signer2015()]).build())
+
+        when:
+        jwsService.addSigners(JwsSignRequest.builder().jws(signed.jws).signers([signerRsa()]).build())
+
+        then:
+        thrown(ClientException)
+    }
+
+    def "verify JWS with empty signatures throws ClientException"() {
+        given:
+        def jws = mapper.createObjectNode()
+        jws.put("payload", Base64.urlEncoder.withoutPadding().encodeToString('{}'.bytes))
+        jws.set("signatures", mapper.createArrayNode())
+
+        when:
+        jwsService.verify(JwsVerifyRequest.builder().jws(jws).build())
 
         then:
         thrown(ClientException)

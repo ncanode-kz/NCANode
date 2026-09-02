@@ -115,6 +115,7 @@ jacocoTestReport {
                     "kz/ncanode/dto/**",
                     "kz/ncanode/util/*",
                     "kz/ncanode/controller/advice/ExceptionHandlerControllerAdvice.class",
+                    "kz/ncanode/service/JwsService\$RawJws.class", // unreachable DecodedJWT stub methods
             ])
         }))
     }
