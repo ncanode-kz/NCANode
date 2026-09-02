@@ -50,35 +50,34 @@ public class PdfService {
 		try {
 			byte[] pdfBytes = Base64.getDecoder().decode(pdfSignRequest.getPdf());
 
-			// Load PDF document
-			PDDocument document = PDDocument.load(new ByteArrayInputStream(pdfBytes));
-
-			// Apply PDF signers
+			// PDFBox allows only one pending signature per save, so each signer is applied
+			// in its own load -> addSignature -> saveIncremental cycle.
 			for (PdfSignRequest.PdfSigner pdfSigner : pdfSignRequest.getSigners()) {
 				var keyStoreWrapper = kalkanWrapper.read(List.of(pdfSigner.getSigner())).get(0);
 
-				PDSignature signature = new PDSignature();
-				signature.setFilter(PDSignature.FILTER_ADOBE_PPKLITE);
-				signature.setSubFilter(PDSignature.SUBFILTER_ETSI_CADES_DETACHED); // ETSI CADES
-				// signature.setSubFilter(PDSignature.SUBFILTER_ADBE_PKCS7_DETACHED);
-				signature.setName(
-						keyStoreWrapper.getCertificate().getX509Certificate().getSubjectX500Principal().getName());
-				signature.setLocation(pdfSigner.getLocation());
-				signature.setReason(pdfSigner.getReason());
-				signature.setContactInfo(pdfSigner.getContactInfo());
-				signature.setSignDate(Calendar.getInstance());
+				try (PDDocument document = PDDocument.load(new ByteArrayInputStream(pdfBytes))) {
+					PDSignature signature = new PDSignature();
+					signature.setFilter(PDSignature.FILTER_ADOBE_PPKLITE);
+					signature.setSubFilter(PDSignature.SUBFILTER_ETSI_CADES_DETACHED); // ETSI CADES
+					// signature.setSubFilter(PDSignature.SUBFILTER_ADBE_PKCS7_DETACHED);
+					signature.setName(
+							keyStoreWrapper.getCertificate().getX509Certificate().getSubjectX500Principal().getName());
+					signature.setLocation(pdfSigner.getLocation());
+					signature.setReason(pdfSigner.getReason());
+					signature.setContactInfo(pdfSigner.getContactInfo());
+					signature.setSignDate(Calendar.getInstance());
 
-				document.addSignature(signature, new PdfSignatureInterface(keyStoreWrapper, pdfSignRequest.isWithTsp(),
-						pdfSignRequest.getTsaPolicy()));
+					document.addSignature(signature, new PdfSignatureInterface(keyStoreWrapper, pdfSignRequest.isWithTsp(),
+							pdfSignRequest.getTsaPolicy()));
+
+					ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+					document.saveIncremental(outputStream);
+					pdfBytes = outputStream.toByteArray();
+				}
 			}
 
-			// Save signed PDF
-			ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-			document.saveIncremental(outputStream);
-			document.close();
-
 			return PdfSignResponse.builder()
-					.pdf(Base64.getEncoder().encodeToString(outputStream.toByteArray()))
+					.pdf(Base64.getEncoder().encodeToString(pdfBytes))
 					.build();
 
 		} catch (Exception e) {

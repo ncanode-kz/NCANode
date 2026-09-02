@@ -121,6 +121,7 @@ class PdfServiceTest extends Specification implements WithTestData {
         def signedPdf = pdfService.sign(buildSignRequest([[KEY_INDIVIDUAL_VALID_SIGN_2004, KEY_INDIVIDUAL_VALID_SIGN_2004_PASSWORD]])).pdf
 
         and: 'mock certificate validation'
+        def issuerCert = hasIssuer ? mockIssuerCertificate(true) : null
         when(certificateService.getCurrentDate()).thenReturn(buildValidDate())
         when(certificateService.attachValidationData(any(), anyBoolean(), anyBoolean()))
             .thenAnswer(new CertificateServiceAnswer(issuerCert))
@@ -142,10 +143,10 @@ class PdfServiceTest extends Specification implements WithTestData {
         response.signers[0].certificate != null
 
         where:
-        caseName             | issuerCert                   | revocationCheck                                                     || expectedValid
-        'valid signer'       | mockIssuerCertificate(true)  | Set.of()                                                            || true
-        'valid ocsp and crl' | mockIssuerCertificate(true)  | Set.of(CertificateRevocation.OCSP, CertificateRevocation.CRL)      || true
-        'invalid issuer'     | null                         | Set.of()                                                            || false
+        caseName             | hasIssuer | revocationCheck                                                || expectedValid
+        'valid signer'       | true      | Set.of()                                                       || true
+        'valid ocsp and crl' | true      | Set.of(CertificateRevocation.OCSP, CertificateRevocation.CRL)  || true
+        'invalid issuer'     | false     | Set.of()                                                       || false
     }
 
     def "test pdf verification without signatures"() {
@@ -197,11 +198,9 @@ class PdfServiceTest extends Specification implements WithTestData {
         return request
     }
 
-    private Date buildValidDate() {
-        def date = mock(Date)
-        when(date.after(any())).thenReturn(true)
-        when(date.before(any())).thenReturn(true)
-        return date
+    // Дата в пределах срока действия KEY_INDIVIDUAL_VALID_SIGN_2004 (2021-01-18 .. 2022-01-18).
+    private static Date buildValidDate() {
+        Date.from(java.time.Instant.parse("2021-07-01T00:00:00Z"))
     }
 
     private CertificateWrapper mockIssuerCertificate(boolean dateValid) {

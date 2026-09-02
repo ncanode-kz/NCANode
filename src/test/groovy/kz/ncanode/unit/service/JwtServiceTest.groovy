@@ -184,6 +184,37 @@ class JwtServiceTest extends Specification implements WithTestData {
         thrown(ClientException)
     }
 
+    def "test jwt encode preserves nested object and array claims"() {
+        given:
+        def payload = new JwtEncodeRequest.JwtPayload()
+        payload.setClaim("address", [city: "Almaty", zip: "050000"])
+        payload.setClaim("roles", ["admin", "user"])
+
+        def header = JwtEncodeRequest.JwtHeader.builder().alg("GG2015").typ("JWT").build()
+        def jwtRequest = JwtEncodeRequest.JwtRequest.builder().header(header).payload(payload).build()
+
+        def encodeResponse = jwtService.encode(JwtEncodeRequest.builder()
+            .jwt(jwtRequest)
+            .key(KEY_INDIVIDUAL_VALID_2015)
+            .password(KEY_INDIVIDUAL_VALID_2015_PASSWORD)
+            .build())
+
+        and:
+        def keystore = kalkanWrapper.read(KEY_INDIVIDUAL_VALID_2015, null, KEY_INDIVIDUAL_VALID_2015_PASSWORD)
+        def certBase64 = Base64.encoder.encodeToString(keystore.getCertificate().getX509Certificate().getEncoded())
+
+        when:
+        def decodeResponse = jwtService.decode(JwtDecodeRequest.builder()
+            .jwt(encodeResponse.jwt)
+            .key(certBase64)
+            .build())
+
+        then:
+        decodeResponse.valid
+        decodeResponse.jwt.payload.get("address") == [city: "Almaty", zip: "050000"]
+        decodeResponse.jwt.payload.get("roles") == ["admin", "user"]
+    }
+
     def "test jwt encode with multiple claims preserves all claims"() {
         given:
         def payload = new JwtEncodeRequest.JwtPayload()

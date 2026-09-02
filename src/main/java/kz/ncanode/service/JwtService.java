@@ -15,6 +15,7 @@ import kz.ncanode.dto.response.JwtEncodeResponse;
 import kz.ncanode.exception.ClientException;
 import kz.ncanode.exception.KeyException;
 import kz.ncanode.exception.ServerException;
+import kz.ncanode.util.JwtAlgorithmUtil;
 import kz.ncanode.wrapper.CertificateWrapper;
 import kz.ncanode.wrapper.KalkanWrapper;
 import kz.ncanode.wrapper.KeyStoreWrapper;
@@ -22,14 +23,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.security.PrivateKey;
-import java.security.PublicKey;
-import java.security.interfaces.ECPrivateKey;
-import java.security.interfaces.ECPublicKey;
-import java.security.interfaces.RSAPrivateKey;
-import java.security.interfaces.RSAPublicKey;
 import java.util.Base64;
+import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -62,7 +59,7 @@ public class JwtService {
                 addClaim(builder, entry.getKey(), entry.getValue());
             }
 
-            Algorithm algorithm = resolveAlgorithm(
+            Algorithm algorithm = JwtAlgorithmUtil.forSigning(
                 jwtEncodeRequest.getJwt().getHeader().getAlg(),
                 cert.getPublicKey(),
                 keystore.getPrivateKey()
@@ -102,7 +99,7 @@ public class JwtService {
                 throw new ClientException(e.getMessage(), e);
             }
 
-            Algorithm algorithm = resolveAlgorithm(
+            Algorithm algorithm = JwtAlgorithmUtil.forVerification(
                 data.getAlgorithm(),
                 x509.getPublicKey()
             );
@@ -141,47 +138,19 @@ public class JwtService {
         }
     }
 
-    private Algorithm resolveAlgorithm(String alg, PublicKey publicKey, PrivateKey privateKey) {
-        return switch (alg) {
-            case "GG2015" -> Algorithm.GG2015((ECPublicKey) publicKey, (ECPrivateKey) privateKey);
-            case "GG2004" -> Algorithm.GG2004((ECPublicKey) publicKey, (ECPrivateKey) privateKey);
-            case "ES256" -> Algorithm.ECDSA256((ECPublicKey) publicKey, (ECPrivateKey) privateKey);
-            case "ES384" -> Algorithm.ECDSA384((ECPublicKey) publicKey, (ECPrivateKey) privateKey);
-            case "ES512" -> Algorithm.ECDSA512((ECPublicKey) publicKey, (ECPrivateKey) privateKey);
-            case "RS256" -> Algorithm.RSA256((RSAPublicKey) publicKey, (RSAPrivateKey) privateKey);
-            case "RS384" -> Algorithm.RSA384((RSAPublicKey) publicKey, (RSAPrivateKey) privateKey);
-            case "RS512" -> Algorithm.RSA512((RSAPublicKey) publicKey, (RSAPrivateKey) privateKey);
-            default -> throw new ClientException("Unsupported algorithm: " + alg);
-        };
-    }
-
-    private Algorithm resolveAlgorithm(String alg, PublicKey publicKey) {
-        return switch (alg) {
-            case "GG2015" -> Algorithm.GG2015((ECPublicKey) publicKey);
-            case "GG2004" -> Algorithm.GG2004((ECPublicKey) publicKey);
-            case "ES256" -> Algorithm.ECDSA256((ECPublicKey) publicKey);
-            case "ES384" -> Algorithm.ECDSA384((ECPublicKey) publicKey);
-            case "ES512" -> Algorithm.ECDSA512((ECPublicKey) publicKey);
-            case "RS256" -> Algorithm.RSA256((RSAPublicKey) publicKey);
-            case "RS384" -> Algorithm.RSA384((RSAPublicKey) publicKey);
-            case "RS512" -> Algorithm.RSA512((RSAPublicKey) publicKey);
-            default -> throw new ClientException("Unsupported algorithm: " + alg);
-        };
-    }
-
+    @SuppressWarnings("unchecked")
     private void addClaim(JWTCreator.Builder builder, String key, Object value) {
-        if (value instanceof String) {
-            builder.withClaim(key, (String) value);
-        } else if (value instanceof Integer) {
-            builder.withClaim(key, (Integer) value);
-        } else if (value instanceof Long) {
-            builder.withClaim(key, (Long) value);
-        } else if (value instanceof Double) {
-            builder.withClaim(key, (Double) value);
-        } else if (value instanceof Boolean) {
-            builder.withClaim(key, (Boolean) value);
-        } else if (value != null) {
-            builder.withClaim(key, value.toString());
+        switch (value) {
+            case null -> { }
+            case String s -> builder.withClaim(key, s);
+            case Integer i -> builder.withClaim(key, i);
+            case Long l -> builder.withClaim(key, l);
+            case Double d -> builder.withClaim(key, d);
+            case Boolean b -> builder.withClaim(key, b);
+            case Date d -> builder.withClaim(key, d);
+            case Map<?, ?> m -> builder.withClaim(key, (Map<String, ?>) m);
+            case List<?> l -> builder.withClaim(key, l);
+            default -> builder.withClaim(key, value.toString());
         }
     }
 }

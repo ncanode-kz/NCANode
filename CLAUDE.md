@@ -40,7 +40,7 @@ NCANode — сервер (Spring Boot 3.5, Java 25, Gradle 9) для работ�
 
 Слои: **controller → service → wrapper**.
 
-- `controller/` — REST-контроллеры, по одному на область API: `xml`, `cms`, `pdf`, `wsse`, `jwt`, `pkcs12`, `x509` (эндпоинты вида `/xml/sign`, `/cms/verify` и т.д.). Ошибки централизованно обрабатывает `controller/advice/ExceptionHandlerControllerAdvice`.
+- `controller/` — REST-контроллеры, по одному на область API: `xml`, `cms`, `pdf`, `wsse`, `jwt`, `jws`, `pkcs12`, `x509` (эндпоинты вида `/xml/sign`, `/cms/verify` и т.д.). `jws` — подпись/проверка произвольного JSON (`/jws/sign`, `/jws/verify`), compact serialization, без семантики claim'ов JWT. Ошибки централизованно обрабатывает `controller/advice/ExceptionHandlerControllerAdvice`.
 - `service/` — бизнес-логика подписи/проверки. `CertificateService` — центральная точка валидации сертификатов: собирает цепочку через `CaService` и статусы отзыва через `OcspService`/`CrlService`. `CaService` и `CrlService` кэшируют корневые сертификаты и CRL-файлы на диск (`cacheDir`) и обновляют кэш по расписанию с TTL из конфигурации. `TspService` использует spring-retry.
 - `wrapper/` — обёртки над KalkanCrypt/JCA API: `KalkanWrapper` (чтение PKCS12-ключей из Base64, преобразование ошибок Kalkan в понятные сообщения), `KeyStoreWrapper`, `CertificateWrapper`, `DocumentWrapper`, `XMLSignatureWrapper`. Прямую работу с Kalkan-провайдером держать здесь, а не в сервисах.
 - `dto/request` и `dto/response` — модели API; ключи подписантов приходят в запросах как Base64 PKCS12 (`SignerRequest`: key, password, keyAlias).
