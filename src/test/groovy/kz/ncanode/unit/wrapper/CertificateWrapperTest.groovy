@@ -39,6 +39,21 @@ class CertificateWrapperTest extends Specification implements WithTestData {
                  'certs/ceo_valid_sign_2004_gost.cer']
     }
 
+    def "toCertificateInfo works for a CA certificate without an extendedKeyUsage extension"() {
+        given:
+        def ca = fromResource('ca/nca_gost2015_test.cer')
+
+        expect:
+        ca.getExtendedKeyUsage().isEmpty()
+        ca.toCertificateInfo(new Date(), false, false).keyUser.isEmpty()
+    }
+
+    def "fromBytes / fromInputStream return empty for input that is not a certificate"() {
+        expect:
+        CertificateWrapper.fromBytes([1, 2, 3] as byte[]).isEmpty()
+        CertificateWrapper.fromInputStream(new ByteArrayInputStream(new byte[0])).isEmpty()
+    }
+
     def "toCertificateInfo of the individual test certificate exposes the IIN"() {
         given:
         def cert = CertificateWrapper.fromBase64(CERT_INDIVIDUAL).get()

@@ -37,4 +37,14 @@ class XMLSignatureWrapperTest extends Specification implements WithTestData {
         then:
         wrapper.xmlSignature != null
     }
+
+    def "getCertificate is empty and check is false when the signature has no X509 data"() {
+        given:
+        def document = new DocumentWrapper('<?xml version="1.0"?><root/>').document
+        def wrapper = new XMLSignatureWrapper(document, 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256')
+
+        expect:
+        wrapper.getCertificate().isEmpty()
+        !wrapper.check()
+    }
 }
