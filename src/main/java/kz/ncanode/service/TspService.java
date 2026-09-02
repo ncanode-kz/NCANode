@@ -34,6 +34,7 @@ import java.security.NoSuchProviderException;
 import java.security.cert.*;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -104,6 +105,55 @@ public class TspService {
 
     public BigInteger generateNonce() {
         return BigInteger.valueOf(System.currentTimeMillis());
+    }
+
+    /**
+     * Полная проверка метки времени: подпись TSA валидна И message imprint совпадает с хешем
+     * переданных данных (метка действительно покрывает эти данные).
+     *
+     * @param token           метка времени
+     * @param timestampedData данные, которые метка должна покрывать
+     * @return {@code true}, если метка валидна и покрывает данные
+     */
+    public boolean verify(TimeStampToken token, byte[] timestampedData) {
+        try {
+            CMSSignedData tokenCms = token.toCMSSignedData();
+
+            if (info(tokenCms).isEmpty()) {
+                return false;
+            }
+
+            TimeStampTokenInfo tstInfo = token.getTimeStampInfo();
+            byte[] expected = MessageDigest.getInstance(tstInfo.getMessageImprintAlgOID(), KalkanProvider.PROVIDER_NAME)
+                .digest(timestampedData);
+
+            return java.util.Arrays.equals(expected, tstInfo.getMessageImprintDigest());
+        } catch (Exception e) {
+            log.warn("Timestamp verification failed: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Извлекает сертификаты (цепочку TSA) из TimeStampToken — для вшивания в XAdES-LT.
+     *
+     * @param token метка времени
+     * @return список сертификатов (пустой при ошибке)
+     */
+    public List<X509Certificate> extractCertificates(TimeStampToken token) {
+        if (token == null) {
+            return List.of();
+        }
+        try {
+            CertStore store = token.getCertificatesAndCRLs("Collection", KalkanProvider.PROVIDER_NAME);
+            return store.getCertificates(null).stream()
+                .filter(X509Certificate.class::isInstance)
+                .map(X509Certificate.class::cast)
+                .toList();
+        } catch (GeneralSecurityException | CMSException e) {
+            log.warn("Cannot extract TSA certificates from timestamp token: {}", e.getMessage());
+            return List.of();
+        }
     }
 
     public SignerInformation addTspToSigner(SignerInformation signer, X509Certificate cert, String useTsaPolicy) throws NoSuchAlgorithmException, NoSuchProviderException, TSPException, IOException {

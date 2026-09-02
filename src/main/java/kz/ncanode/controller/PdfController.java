@@ -1,5 +1,6 @@
 package kz.ncanode.controller;
 
+import kz.ncanode.dto.request.PdfExtendRequest;
 import kz.ncanode.dto.request.PdfSignRequest;
 import kz.ncanode.dto.request.PdfVerifyRequest;
 import kz.ncanode.dto.response.PdfSignResponse;
@@ -12,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 
@@ -27,6 +28,11 @@ public class PdfController {
 	@PostMapping("/sign")
 	public ResponseEntity<PdfSignResponse> sign(@Valid @RequestBody PdfSignRequest pdfSignRequest) {
 		return ResponseEntity.ok(pdfService.sign(pdfSignRequest));
+	}
+
+	@PostMapping("/extend")
+	public ResponseEntity<PdfSignResponse> extend(@Valid @RequestBody PdfExtendRequest pdfExtendRequest) {
+		return ResponseEntity.ok(pdfService.extend(pdfExtendRequest));
 	}
 
 	@PostMapping("/verify")

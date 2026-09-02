@@ -195,7 +195,8 @@ public class CertificateWrapper {
 
     public List<String> getExtendedKeyUsage() {
         try {
-            return getX509Certificate().getExtendedKeyUsage();
+            // getExtendedKeyUsage() возвращает null, если расширения EKU в сертификате нет
+            return Optional.ofNullable(getX509Certificate().getExtendedKeyUsage()).orElse(Collections.emptyList());
         } catch (CertificateParsingException e) {
             log.error("Certificate key user extracting error", e);
             return Collections.emptyList();
@@ -224,7 +225,10 @@ public class CertificateWrapper {
 
     public static Optional<CertificateWrapper> fromInputStream(final InputStream inputStream) {
         try {
-            return Optional.of(new CertificateWrapper((X509Certificate) CertificateFactory.getInstance("X.509", KalkanProvider.PROVIDER_NAME).generateCertificate(inputStream)));
+            // generateCertificate может вернуть null на пустом/мусорном вводе, не бросив исключение
+            final var cert = (X509Certificate) CertificateFactory.getInstance("X.509", KalkanProvider.PROVIDER_NAME)
+                .generateCertificate(inputStream);
+            return Optional.ofNullable(cert).map(CertificateWrapper::new);
         } catch (CertificateException|NoSuchProviderException e) {
             return Optional.empty();
         }

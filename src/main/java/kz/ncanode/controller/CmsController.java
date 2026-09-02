@@ -2,6 +2,7 @@ package kz.ncanode.controller;
 
 import kz.ncanode.dto.certificate.CertificateRevocation;
 import kz.ncanode.dto.request.CmsCreateRequest;
+import kz.ncanode.dto.request.CmsExtendRequest;
 import kz.ncanode.dto.request.CmsVerifyRequest;
 import kz.ncanode.dto.response.CmsDataResponse;
 import kz.ncanode.dto.response.CmsResponse;
@@ -14,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 
@@ -33,6 +34,11 @@ public class CmsController {
     @PostMapping("/sign/add")
     public ResponseEntity<CmsResponse> signAdd(@Valid @RequestBody CmsCreateRequest cmsCreateRequest) {
         return ResponseEntity.ok(cmsService.addSigners(cmsCreateRequest));
+    }
+
+    @PostMapping("/extend")
+    public ResponseEntity<CmsResponse> extend(@Valid @RequestBody CmsExtendRequest cmsExtendRequest) {
+        return ResponseEntity.ok(cmsService.extend(cmsExtendRequest));
     }
 
     @PostMapping("/verify")

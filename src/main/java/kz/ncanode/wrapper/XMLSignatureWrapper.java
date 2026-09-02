@@ -63,8 +63,17 @@ public class XMLSignatureWrapper {
 
     public Optional<CertificateWrapper> getCertificate() {
         try {
-            return Optional.of(new CertificateWrapper(xmlSignature.getKeyInfo().getX509Certificate()));
-        } catch (KeyResolverException e) {
+            // getKeyInfo() / getX509Certificate() возвращают null, если в подписи нет X509-данных
+            return Optional.ofNullable(xmlSignature.getKeyInfo())
+                .map(keyInfo -> {
+                    try {
+                        return keyInfo.getX509Certificate();
+                    } catch (KeyResolverException e) {
+                        return null;
+                    }
+                })
+                .map(CertificateWrapper::new);
+        } catch (Exception e) {
             return Optional.empty();
         }
     }

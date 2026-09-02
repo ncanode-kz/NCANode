@@ -37,7 +37,7 @@ interface WithTestData {
     /**
      * Сообщение для неверного алиаса
      */
-    final static String KEY_INVALID_ALIAS_MESSAGE = String.format(MessageConstants.KEY_ALIAS_NOT_FOUND, KEY_INVALID_ALIAS)
+    final static String KEY_INVALID_ALIAS_MESSAGE = String.format(MessageConstants.KEY_ALIAS_NOT_FOUND, 'invalidalias000')
 
     /**
      * Ключ для физ.лиц, действующий, для подписи, старый (2004)

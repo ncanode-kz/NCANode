@@ -20,7 +20,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.support.PeriodicTrigger;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -29,8 +29,8 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Path;
 import java.security.cert.*;
+import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -58,8 +58,8 @@ public class CrlService {
         }
 
         log.info("Initializing '{}' CRL Service...", crlServiceType);
-        val periodicTrigger = new PeriodicTrigger(crlConfiguration.getTtl(), TimeUnit.MINUTES);
-        periodicTrigger.setInitialDelay(0);
+        val periodicTrigger = new PeriodicTrigger(Duration.ofMinutes(crlConfiguration.getTtl()));
+        periodicTrigger.setInitialDelay(Duration.ZERO);
         periodicTrigger.setFixedRate(true);
         taskScheduler.schedule(() -> updateCache(false, crlConfiguration, CRL_CACHE_FULL_DIR_NAME), periodicTrigger);
     }
@@ -71,8 +71,8 @@ public class CrlService {
         }
 
         log.info("Initializing '{}' CRL Delta Service...", crlServiceType);
-        val periodicTrigger = new PeriodicTrigger(crlConfiguration.getDelta().getTtl(), TimeUnit.MINUTES);
-        periodicTrigger.setInitialDelay(0);
+        val periodicTrigger = new PeriodicTrigger(Duration.ofMinutes(crlConfiguration.getDelta().getTtl()));
+        periodicTrigger.setInitialDelay(Duration.ZERO);
         periodicTrigger.setFixedRate(true);
         taskScheduler.schedule(() -> updateCache(false, crlConfiguration.getDelta(), CRL_CACHE_DELTA_DIR_NAME), periodicTrigger);
     }
@@ -114,6 +114,35 @@ public class CrlService {
         return CrlStatus.builder()
             .result(CrlResult.ACTIVE)
             .build();
+    }
+
+    /**
+     * Возвращает DER-кодированные CRL из кэша (full + delta), покрывающие переданный сертификат
+     * (издатель CRL совпадает с издателем сертификата). Для вшивания в XAdES-LT.
+     *
+     * @param certificate сертификат, для которого нужны CRL
+     * @return список DER-кодированных CRL (может быть пустым)
+     */
+    public List<byte[]> getEncodedCrlsFor(X509Certificate certificate) {
+        final List<byte[]> result = new ArrayList<>();
+
+        for (final String cacheDirectory : List.of(CRL_CACHE_FULL_DIR_NAME, CRL_CACHE_DELTA_DIR_NAME)) {
+            for (final File crlFile : getCrlFiles(cacheDirectory)) {
+                final X509CRL crl = loadCrl(crlFile);
+
+                if (!crl.getIssuerX500Principal().equals(certificate.getIssuerX500Principal())) {
+                    continue;
+                }
+
+                try {
+                    result.add(crl.getEncoded());
+                } catch (CRLException e) {
+                    log.warn("Cannot encode CRL file {}: {}", crlFile.getName(), e.getMessage());
+                }
+            }
+        }
+
+        return result;
     }
 
     /**

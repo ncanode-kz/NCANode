@@ -1,6 +1,19 @@
 coverage:
+  precision: 2
+  round: down
   status:
     project:
       default:
-        target: 60%
+        target: 90%
         threshold: 1%
+    patch:
+      default:
+        target: 80%
+        threshold: 5%
+
+comment:
+  layout: "condensed_header, diff, files"
+  require_changes: true
+
+github_checks:
+  annotations: true

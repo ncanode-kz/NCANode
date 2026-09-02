@@ -1,6 +1,6 @@
 plugins {
-    id 'org.springframework.boot' version '2.7.2'
-    id 'io.spring.dependency-management' version '1.0.12.RELEASE'
+    id 'org.springframework.boot' version '3.5.16'
+    id 'io.spring.dependency-management' version '1.1.7'
     id 'java'
     id 'groovy'
     id 'war'
@@ -9,11 +9,25 @@ plugins {
 
 group 'kz'
 version project.hasProperty('version') ? version : '3.0.0-SNAPSHOT'
-sourceCompatibility = '17'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
 
 configurations {
     compileOnly {
         extendsFrom annotationProcessor
+    }
+    // jaxws-rt тянет JAXB под старыми координатами com.sun.xml.bind,
+    // а транзитивно приходит тот же код как org.glassfish.jaxb — оставляем один вариант
+    configureEach {
+        exclude group: 'com.sun.xml.bind', module: 'jaxb-core'
+        exclude group: 'com.sun.xml.bind', module: 'jaxb-impl'
+        // pdfbox/fontbox тянут commons-logging:1.2 — его API уже даёт spring-jcl,
+        // а два jcl на classpath = warning "please remove commons-logging.jar"
+        exclude group: 'commons-logging', module: 'commons-logging'
     }
 }
 
@@ -24,34 +38,35 @@ repositories {
     mavenLocal()
     mavenCentral()
     maven {
-        url 'https://pkgs.dev.azure.com/as1an/public/_packaging/repo/maven/v1'
+        url = 'https://pkgs.dev.azure.com/as1an/public/_packaging/repo/maven/v1'
     }
 }
 
 dependencies {
     // Spring
-    implementation 'org.codehaus.groovy:groovy-all:3.0.13'
     implementation 'org.springframework.boot:spring-boot-starter-web'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
     implementation 'org.springframework.boot:spring-boot-starter-cache'
     annotationProcessor "org.springframework.boot:spring-boot-configuration-processor"
-    implementation 'org.apache.httpcomponents:httpclient:4.5.13'
-    implementation 'org.springframework:spring-aspects:5.3.23'
-    implementation 'org.springframework.retry:spring-retry:1.3.3'
+    implementation 'org.apache.httpcomponents:httpclient:4.5.14'
+    implementation 'org.springframework:spring-aspects'
+    implementation 'org.springframework.retry:spring-retry:2.0.12'
     providedRuntime 'org.springframework.boot:spring-boot-starter-tomcat'
 
     // Spock/Mockito
-    testImplementation 'org.spockframework:spock-core:2.2-groovy-3.0'
-    testImplementation 'org.spockframework:spock-spring:2.2-groovy-3.0'
-    testImplementation 'org.mockito:mockito-core:4.8.0'
+    testImplementation 'org.apache.groovy:groovy'
+    testImplementation 'org.apache.groovy:groovy-xml'
+    testImplementation 'org.spockframework:spock-core:2.4-groovy-4.0'
+    testImplementation 'org.spockframework:spock-spring:2.4-groovy-4.0'
+    testImplementation 'org.mockito:mockito-core'
 
     // Lombok
-    testCompileOnly 'org.projectlombok:lombok:1.18.24'
-    testAnnotationProcessor 'org.projectlombok:lombok:1.18.24'
-    compileOnly 'org.projectlombok:lombok:1.18.24'
-    annotationProcessor 'org.projectlombok:lombok:1.18.24'
+    testCompileOnly 'org.projectlombok:lombok:1.18.46'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.46'
+    compileOnly 'org.projectlombok:lombok:1.18.46'
+    annotationProcessor 'org.projectlombok:lombok:1.18.46'
 
     // KalkanCrypt
     implementation name: 'knca_provider_jce_kalkan-0.7.5'
@@ -59,15 +74,21 @@ dependencies {
     implementation 'org.apache.santuario:xmlsec:3.0.3'
 
     // JWT GG2015
-    implementation 'kz.gov.pki:java-jwt:4.4.0'
+    implementation('kz.gov.pki:java-jwt:4.4.0') {
+        // провайдер Kalkan уже подключён из lib/ (flatDir), иначе bootJar падает на дубликате
+        exclude group: 'kz.gov.pki.kalkan', module: 'knca_provider_jce_kalkan'
+    }
 
     // SOAP/WSSE
     implementation 'org.apache.ws.security:wss4j:1.6.19'
     implementation 'org.apache.wss4j:wss4j-ws-security-dom:2.4.1'
-    implementation 'jakarta.xml.ws:jakarta.xml.ws-api:3.0.1'
-    implementation 'com.sun.xml.ws:jaxws-rt:3.0.2'
-    implementation 'org.springdoc:springdoc-openapi-ui:1.8.0'
-    
+    implementation 'jakarta.xml.ws:jakarta.xml.ws-api:4.0.2'
+    implementation 'com.sun.xml.ws:jaxws-rt:4.0.3'
+    // SAAJ-реализация (MessageFactory для WsseService); транзитивно из jaxws-rt
+    // её теряет резолвер IntelliJ — подключаем явно, версия из Spring BOM
+    implementation 'com.sun.xml.messaging.saaj:saaj-impl'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.6'
+
     // PDFBox for PDF signing and verification
     implementation 'org.apache.pdfbox:pdfbox:2.0.29'
     implementation 'org.bouncycastle:bcprov-jdk15on:1.70'
@@ -84,8 +105,8 @@ springBoot {
 
 jacocoTestReport {
     reports {
-        xml.enabled true
-        html.enabled false
+        xml.required = true
+        html.required = false
     }
 
     afterEvaluate {
@@ -96,8 +117,10 @@ jacocoTestReport {
                     "kz/ncanode/exception/*",
                     "kz/ncanode/configuration/**",
                     "kz/ncanode/dto/**",
+                    "kz/ncanode/annotation/*",
                     "kz/ncanode/util/*",
                     "kz/ncanode/controller/advice/ExceptionHandlerControllerAdvice.class",
+                    "kz/ncanode/service/JwsService\$RawJws.class", // unreachable DecodedJWT stub methods
             ])
         }))
     }

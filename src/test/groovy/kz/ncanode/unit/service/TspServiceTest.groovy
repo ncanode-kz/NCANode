@@ -59,4 +59,68 @@ class TspServiceTest extends Specification implements WithTestData {
         and:
         token.get().nonce == TSP_SAMPLE_NONCE
     }
+
+    def "info returns empty for a CMS that is not a timestamp token"() {
+        given:
+        def notAToken = new CMSSignedData(ResourceUtils.getFile('classpath:cades/cades-test-signed-b.p7s').bytes)
+
+        expect:
+        tspService.info(notAToken).isEmpty()
+    }
+
+    def "generateNonce returns an increasing value"() {
+        expect:
+        tspService.generateNonce() != null
+        tspService.generateNonce() <= tspService.generateNonce()
+    }
+
+    def "extractCertificates returns an empty list for a null token"() {
+        expect:
+        tspService.extractCertificates(null).isEmpty()
+    }
+
+    def "extractCertificates reads the TSA chain from a token"() {
+        given:
+        def token = new kz.gov.pki.kalkan.tsp.TimeStampToken(new CMSSignedData(new FileInputStream(TSP_SAMPLE_TOKEN)))
+
+        expect:
+        !tspService.extractCertificates(token).isEmpty()
+    }
+
+    def "verify fails when the imprint does not cover the given data"() {
+        given:
+        def token = new kz.gov.pki.kalkan.tsp.TimeStampToken(new CMSSignedData(new FileInputStream(TSP_SAMPLE_TOKEN)))
+
+        expect:
+        !tspService.verify(token, [1, 2, 3] as byte[])
+    }
+
+    def "create throws TspException when the TSP url is not configured"() {
+        given:
+        def config = Mock(kz.ncanode.configuration.TspConfiguration) {
+            getParsedUrl() >> Optional.empty()
+            getRetries() >> 2
+        }
+        def service = new TspService(client, config)
+
+        when:
+        service.create(SAMPLE_DATA, TSPAlgorithms.SHA1, KNCAObjectIdentifiers.tsa_gost_policy.getId())
+
+        then:
+        thrown(kz.ncanode.exception.TspException)
+    }
+
+    def "create throws TspException when every attempt gets a bad HTTP status"() {
+        given:
+        def statusLine = Mock(org.apache.http.StatusLine) { getStatusCode() >> 500 }
+        def response = Mock(org.apache.http.client.methods.CloseableHttpResponse) { getStatusLine() >> statusLine }
+        doReturn(response).when(client).execute(any(HttpUriRequest))
+        doReturn(TSP_SAMPLE_NONCE).when(tspService).generateNonce()
+
+        when:
+        tspService.create(SAMPLE_DATA, TSPAlgorithms.SHA1, KNCAObjectIdentifiers.tsa_gost_policy.getId())
+
+        then:
+        thrown(kz.ncanode.exception.TspException)
+    }
 }

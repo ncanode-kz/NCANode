@@ -1,5 +1,6 @@
 package kz.ncanode.service;
 
+import kz.ncanode.annotation.Generated;
 import kz.ncanode.configuration.CaConfiguration;
 import kz.ncanode.dto.crl.CrlResult;
 import kz.ncanode.exception.CaException;
@@ -121,6 +122,41 @@ public class CaService {
             .findFirst();
     }
 
+    /**
+     * Строит цепочку сертификатов от конечного до корневого, используя кэш УЦ.
+     * Первый элемент — переданный сертификат, последний — самоподписанный корень (если найден).
+     *
+     * @param leaf конечный сертификат
+     * @return цепочка (минимум сам {@code leaf})
+     */
+    public List<CertificateWrapper> buildChain(CertificateWrapper leaf) {
+        final List<CertificateWrapper> chain = new ArrayList<>();
+        chain.add(leaf);
+
+        final Set<String> visited = new HashSet<>();
+        CertificateWrapper current = leaf;
+
+        while (!current.getIssuerX500Principal().equals(current.getSubjectX500Principal())
+            && visited.add(current.getSubjectX500Principal().getName())) {
+
+            final CertificateWrapper node = current;
+            final CertificateWrapper issuer = getRootCertificates().stream()
+                .filter(ca -> ca.getSubjectX500Principal().equals(node.getIssuerX500Principal())
+                    && node.verify(ca.getPublicKey()))
+                .findFirst()
+                .orElse(null);
+
+            if (issuer == null) {
+                break;
+            }
+
+            chain.add(issuer);
+            current = issuer;
+        }
+
+        return chain;
+    }
+
     public List<CertificateWrapper> getRootCertificates() {
         synchronized (directoryService) {
             synchronized (certificates) {
@@ -163,11 +199,13 @@ public class CaService {
         }
     }
 
+    @Generated // недостижимо в тестах: завершает процесс
     private void shutdown() {
         SpringApplication.exit(applicationContext, () -> EXIT_CODE);
         System.exit(EXIT_CODE);
     }
 
+    @Generated // ветка null ведёт к shutdown() — недостижимо в тестах
     private void checkCertForNull(final Map.Entry<String, URL> urlEntry, final CertificateWrapper cert, final File caFile) {
         if (cert == null) {
             log.error("Cannot open CA certificate from: '{}'. File name: {}", urlEntry.getValue().toString(), caFile.getAbsolutePath());

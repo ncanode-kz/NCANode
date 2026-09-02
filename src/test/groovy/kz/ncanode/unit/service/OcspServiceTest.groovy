@@ -83,4 +83,53 @@ class OcspServiceTest extends Specification implements WithTestData {
         nonce != null
         nonce.size() == OCSP_RESPONSE_CEO_2015_REVOKED_NONCE.size()
     }
+
+    def "verify returns UNKNOWN when the issuer certificate is missing"() {
+        given:
+        def key = kalkanWrapper.read(KEY_INDIVIDUAL_VALID_2015, null, KEY_INDIVIDUAL_VALID_2015_PASSWORD)
+
+        when:
+        def statuses = ocspService.verify(key.certificate, null)
+
+        then:
+        statuses.size() == 1
+        statuses[0].result == OcspResult.UNKOWN
+    }
+
+    def "getRawResponses returns an empty list when the issuer is missing"() {
+        given:
+        def key = kalkanWrapper.read(KEY_INDIVIDUAL_VALID_2015, null, KEY_INDIVIDUAL_VALID_2015_PASSWORD)
+
+        expect:
+        ocspService.getRawResponses(key.certificate, null).isEmpty()
+    }
+
+    def "getRawResponses collects successful DER OCSP responses"() {
+        given:
+        def ocspInputStream = new FileInputStream(OCSP_RESPONSE_INDIVIDUAL_SIGN_2004)
+        doReturn(createMockedResponse(ocspInputStream)).when(client).execute(any(HttpUriRequest))
+
+        def key = kalkanWrapper.read(KEY_INDIVIDUAL_VALID_SIGN_2004, null, KEY_INDIVIDUAL_VALID_SIGN_2004_PASSWORD)
+        def nca = CertificateWrapper.fromBase64(NCA_2004_RSA_CERT).orElseThrow()
+
+        when:
+        def responses = ocspService.getRawResponses(key.certificate, nca)
+
+        then:
+        responses.size() == 1
+        new kz.gov.pki.kalkan.ocsp.OCSPResp(responses[0]).status == 0
+
+        cleanup:
+        ocspInputStream.close()
+    }
+
+    def "getRawResponses skips transport failures"() {
+        given:
+        doReturn(null).when(client).execute(any(HttpUriRequest))
+        def key = kalkanWrapper.read(KEY_INDIVIDUAL_VALID_SIGN_2004, null, KEY_INDIVIDUAL_VALID_SIGN_2004_PASSWORD)
+        def nca = CertificateWrapper.fromBase64(NCA_2004_RSA_CERT).orElseThrow()
+
+        expect:
+        ocspService.getRawResponses(key.certificate, nca).isEmpty()
+    }
 }
