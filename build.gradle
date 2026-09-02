@@ -24,6 +24,9 @@ configurations {
     configureEach {
         exclude group: 'com.sun.xml.bind', module: 'jaxb-core'
         exclude group: 'com.sun.xml.bind', module: 'jaxb-impl'
+        // pdfbox/fontbox тянут commons-logging:1.2 — его API уже даёт spring-jcl,
+        // а два jcl на classpath = warning "please remove commons-logging.jar"
+        exclude group: 'commons-logging', module: 'commons-logging'
     }
 }
 
