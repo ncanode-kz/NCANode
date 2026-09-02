@@ -102,7 +102,7 @@ class CadesServiceTest extends Specification implements WithTestData {
             .get(new kz.gov.pki.kalkan.asn1.DERObjectIdentifier(ID_AA_ETS_ARCHIVE_TIMESTAMP_V3)) != null
     }
 
-    def "CAdES profile is rejected on /cms/sign/add"() {
+    def "co-signing with a CAdES profile is rejected"() {
         given:
         def req = new CmsCreateRequest()
         req.cms = 'AA=='
@@ -114,7 +114,74 @@ class CadesServiceTest extends Specification implements WithTestData {
 
         then:
         def e = thrown(ClientException)
-        e.message.contains('CAdES')
+        e.message.contains('/cms/extend')
+    }
+
+    def "extend raises a CAdES-T signature to #target"() {
+        given:
+        stubTimestamp()
+        when(certificateService.collectAdesValidationData(any(), any())).thenReturn(sampleValidationData())
+        def t = Base64.encoder.encodeToString(fixture('cades/cades-test-signed-t.p7s'))
+
+        def req = new kz.ncanode.dto.request.CmsExtendRequest()
+        req.cms = t
+        req.cadesLevel = target
+
+        when:
+        def extended = new CMSSignedData(Base64.decoder.decode(cmsService.extend(req).cms))
+
+        then: 'validation data embedded'
+        crlCount(extended) >= 1
+
+        and:
+        (firstSigner(extended).unsignedAttributes
+            .get(new kz.gov.pki.kalkan.asn1.DERObjectIdentifier(ID_AA_ETS_ARCHIVE_TIMESTAMP_V3)) != null) == archive
+
+        where:
+        target        || archive
+        AdesLevel.LT  || false
+        AdesLevel.LTA || true
+    }
+
+    def "detached CAdES: sign, then verify with the external data"() {
+        given:
+        stubTimestamp()
+        when(certificateService.getCurrentDate()).thenReturn(
+            Date.from(java.time.Instant.parse('2026-09-02T11:00:00Z')))
+        when(certificateService.attachValidationData(any(), org.mockito.ArgumentMatchers.anyBoolean(),
+            org.mockito.ArgumentMatchers.anyBoolean())).thenAnswer { inv ->
+            def c = inv.getArgument(0, kz.ncanode.wrapper.CertificateWrapper)
+            def issuer = org.mockito.Mockito.mock(kz.ncanode.wrapper.CertificateWrapper)
+            when(issuer.isDateValid(any())).thenReturn(true)
+            c.setIssuerCertificate(issuer)
+            null
+        }
+
+        def data = 'detached cades payload'
+        def req = new CmsCreateRequest()
+        req.data = Base64.encoder.encodeToString(data.getBytes(StandardCharsets.UTF_8))
+        req.signers = [SIGNER_REQUEST_VALID_2015()]
+        req.cadesLevel = AdesLevel.T
+        req.detached = true
+
+        when:
+        def cms = cmsService.create(req).cms
+        def parsed = new CMSSignedData(Base64.decoder.decode(cms))
+
+        then: 'CMS carries no content'
+        parsed.signedContent == null
+
+        when: 'verify supplying the external data'
+        def response = cmsService.verify(cms, req.data, false, false)
+
+        then:
+        response.signers.size() == 1
+        response.signers[0].adesLevel == AdesLevel.T
+        response.signers[0].status == kz.ncanode.dto.ades.AdesValidationStatus.VALID
+    }
+
+    private static byte[] fixture(String name) {
+        ResourceUtils.getFile("classpath:${name}").bytes
     }
 
     // --- helpers ---
@@ -130,8 +197,9 @@ class CadesServiceTest extends Specification implements WithTestData {
     private void stubTimestamp() {
         def token = new TimeStampToken(new CMSSignedData(
             new FileInputStream(ResourceUtils.getFile('classpath:tsp/tsp_token.bin'))))
-        // spy: только create() замокан, addTspToSigner / extractCertificates идут по-настоящему
+        // spy: только create()/verify() замоканы, addTspToSigner / extractCertificates идут по-настоящему
         org.mockito.Mockito.doReturn(token).when(tspService).create(any(byte[]), any(String), any(String))
+        org.mockito.Mockito.doReturn(true).when(tspService).verify(any(), any())
     }
 
     private static SignerInformation firstSigner(CMSSignedData cms) {

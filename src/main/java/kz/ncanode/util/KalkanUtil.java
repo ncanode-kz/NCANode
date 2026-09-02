@@ -154,6 +154,29 @@ public class KalkanUtil {
         }
     }
 
+    /**
+     * Проверяет, что хеш сертификата в {@code id-aa-signingCertificateV2} подписанта совпадает
+     * с {@code certificate}. Если атрибута нет — {@code true} (проверить нечего).
+     */
+    public static boolean signingCertificateV2HashMatches(
+            kz.gov.pki.kalkan.jce.provider.cms.SignerInformation signer, java.security.cert.X509Certificate certificate) {
+        if (signer == null || certificate == null || signer.getSignedAttributes() == null) {
+            return true;
+        }
+        var attr = signer.getSignedAttributes().get(PKCSObjectIdentifiers.id_aa_signingCertificateV2);
+        if (attr == null) {
+            return true;
+        }
+        try {
+            var essId = SigningCertificateV2.getInstance(attr.getAttrValues().getObjectAt(0)).getCerts()[0];
+            byte[] actual = MessageDigest.getInstance("SHA-256", KalkanProvider.PROVIDER_NAME)
+                .digest(certificate.getEncoded());
+            return java.util.Arrays.equals(essId.getCertHash(), actual);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public static String getHashingAlgorithmByOID(String oid) {
         HashMap<String, String> algos = new HashMap<>();
 

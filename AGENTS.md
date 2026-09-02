@@ -88,7 +88,34 @@ GOST-2015 (действующий на 2026–2027):
 
   Все 4 уровня XAdES, CAdES и PAdES из NCANode проходят `ValidationReport[VALID]` в движке NCALayer
   (`scratchpad/ltref/VerifyXades.java`, `VerifyCades.java`, `VerifyPades.java`).
-- **JAdES** — не начато (нет референса NCALayer, см. PLAN.md Фаза 3).
+
+**AdES-верификация** (Фаза 4) — `service/AdesVerificationService`, общая для XAdES/CAdES/PAdES:
+- проверка метки времени подписи (`TspService.verify`: подпись TSA + imprint над правильными данными);
+- «доказанное время подписи» = genTime валидной метки, иначе момент проверки — на неё проверяются
+  срок действия сертификата и издателя (а не `new Date()`);
+- определение уровня (`detectLevel`): метка → T, вшитый отзыв → LT, архивная метка → LTA;
+- **проверка отзыва** (`checkRevocation`): приоритет вшитых CRL/OCSP над онлайн-запросами
+  (CAdES `SignedData.crls`, XAdES `Encapsulated{CRL,OCSP}Value`, PAdES `/DSS/{CRLs,OCSPs}`);
+  самый строгий исход выигрывает; POE по дате отзыва (отзыв позже подписи → всё ещё valid);
+- **грейдинг** (`grade`): `AdesValidationStatus {VALID, INVALID, INDETERMINATE}` +
+  `AdesSubIndication` (подмножество ETSI EN 319 102-1: `SIG_CRYPTO_FAILURE`, `CERT_HASH_MISMATCH`,
+  `TIMESTAMP_INVALID`, `OUT_OF_BOUNDS_NO_POE`, `CHAIN_INCOMPLETE`, `CERT_REVOKED`, `REVOKED_NO_POE`,
+  `REVOCATION_DATA_MISSING` …);
+- проверка `SigningCertificateV2` хеша (`KalkanUtil.signingCertificateV2HashMatches` / `CertDigest` в XAdES).
+Ответы `verify` несут `adesLevel`, `bestSignatureTime`, `tsp`/`signatureTimestamp`, `status`, `subIndication`.
+Не делается: полная цепочка индикаций всех промежуточных проверок, проверка самих archive-timestamp
+(пересчёт имприта — только парсинг + genTime).
+
+**`id-aa-CMS-algorithm-protection`** — не добавляем: Kalkan-генератор (`addSigner(..., AttributeTable, ...)`)
+молча отбрасывает неизвестные signed-атрибуты, движок NCALayer выдаёт CAdES-B без него (значит, для РК не требуется).
+
+**`/cms/extend`, `/pdf/extend`** — достройка готовой подписи до LT/LTA (`CmsExtendRequest`/`PdfExtendRequest`,
+поле `cadesLevel`/`padesLevel`). Идемпотентно: не дублирует уже вшитые метку/отзыв. Co-sign с профилем
+по-прежнему не поддержан (`/cms/sign/add` → `ClientException` с подсказкой на `/cms/extend`).
+
+Эталоны PAdES: `src/test/resources/pades/sample-signed-{b,t,lt,lta}.pdf` (+ `sample.pdf`), `PadesFixtureSpec`.
+B/T подписаны пользователем; LT/LTA — `scratchpad/ltref/GenPades.java` (`extend` через движок NCALayer,
+`/DocTimeStamp` от test-TSA `test.pki.gov.kz/tsp/`).
 
 Референс — движок `kz.gov.pki.ades` из NCALayer (`knca_provider_util 0.9`, бандл `bundle23`), декомпилированный в `scratchpad` сессии. Ключевые факты:
 

@@ -106,6 +106,42 @@ class PadesServiceTest extends Specification implements WithTestData {
         }
     }
 
+    def "extend raises a signed PDF to #target"() {
+        given:
+        stubTimestamp()
+        doReturn(sampleValidationData()).when(certificateService).collectAdesValidationData(any(), any())
+
+        def req = new kz.ncanode.dto.request.PdfExtendRequest()
+        req.pdf = Base64.encoder.encodeToString(
+            ResourceUtils.getFile('classpath:pades/sample-signed-t.pdf').bytes)
+        req.padesLevel = target
+
+        when:
+        def pdf = Base64.decoder.decode(pdfService.extend(req).pdf)
+
+        then:
+        containsMarker(pdf, '/DSS')
+        containsMarker(pdf, '/DocTimeStamp') == archive
+
+        where:
+        target        || archive
+        AdesLevel.LT  || false
+        AdesLevel.LTA || true
+    }
+
+    def "extend rejects a B/T target"() {
+        given:
+        def req = new kz.ncanode.dto.request.PdfExtendRequest()
+        req.pdf = Base64.encoder.encodeToString(blankPdf())
+        req.padesLevel = AdesLevel.T
+
+        when:
+        pdfService.extend(req)
+
+        then:
+        thrown(kz.ncanode.exception.ClientException)
+    }
+
     // --- helpers ---
 
     private byte[] sign(AdesLevel level) {

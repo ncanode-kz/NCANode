@@ -48,6 +48,7 @@ public class PdfService {
 	private final KalkanWrapper kalkanWrapper;
 	private final TspService tspService;
 	private final CertificateService certificateService;
+	private final AdesVerificationService adesVerificationService;
 
 	/**
 	 * Signs a PDF document with digital signature
@@ -114,6 +115,35 @@ public class PdfService {
 	private static String tsaPolicyId(TsaPolicy policy) {
 		return Optional.ofNullable(policy).map(TsaPolicy::getPolicyId)
 				.orElse(TsaPolicy.TSA_GOST2015_POLICY.getPolicyId());
+	}
+
+	/**
+	 * Достраивает подписанный PDF до PAdES-LT / LTA.
+	 */
+	public PdfSignResponse extend(kz.ncanode.dto.request.PdfExtendRequest request) {
+		try {
+			if (!request.getPadesLevel().isAtLeast(AdesLevel.LT)) {
+				throw new ClientException("PAdES extension supports only LT and LTA; sign at B or T level");
+			}
+
+			byte[] pdfBytes = Base64.getDecoder().decode(request.getPdf());
+			String tsaPolicyId = tsaPolicyId(request.getTsaPolicy());
+
+			pdfBytes = addDocumentSecurityStore(pdfBytes);
+
+			if (request.getPadesLevel().isAtLeast(AdesLevel.LTA)) {
+				pdfBytes = addDocumentTimestamp(pdfBytes, tsaPolicyId);
+				pdfBytes = addDocumentSecurityStore(pdfBytes);
+			}
+
+			return PdfSignResponse.builder()
+					.pdf(Base64.getEncoder().encodeToString(pdfBytes))
+					.build();
+		} catch (ClientException e) {
+			throw e;
+		} catch (Exception e) {
+			throw new ServerException("Error extending PDF: " + e.getMessage(), e);
+		}
 	}
 
 	/**
@@ -245,8 +275,18 @@ public class PdfService {
 				throw new NoSignaturesFoundException("PDF document contains no digital signatures");
 			}
 
+			boolean hasDss = document.getDocumentCatalog().getCOSObject()
+					.getDictionaryObject(COSName.getPDFName("DSS")) != null;
+			boolean hasDocTimestamp = signatures.stream().anyMatch(PdfService::isDocumentTimestamp);
+			var embeddedRevocation = extractDssRevocation(document);
+
 			for (PDSignature signature : signatures) {
-				PdfSignerInfo signerInfo = verifySignature(signature, pdfVerifyRequest, pdfBytes, currentDate);
+				if (isDocumentTimestamp(signature)) {
+					continue; // /DocTimeStamp — метка документа, не подпись
+				}
+
+				PdfSignerInfo signerInfo = verifySignature(signature, pdfVerifyRequest, pdfBytes, currentDate,
+						hasDss, hasDocTimestamp, embeddedRevocation);
 				signerInfos.add(signerInfo);
 
 				if (!signerInfo.isValid()) {
@@ -276,10 +316,60 @@ public class PdfService {
 	 * @param pdfVerifyRequest user request (contains revocation settings)
 	 * @param originalPdfBytes the exact original PDF bytes that were verified/sent
 	 */
+	private static boolean isDocumentTimestamp(PDSignature signature) {
+		return "DocTimeStamp".equals(signature.getCOSObject().getNameAsString(COSName.TYPE));
+	}
+
+	private static X509Certificate firstCert(Collection<? extends Certificate> certs) {
+		return certs == null || certs.isEmpty() ? null : (X509Certificate) certs.iterator().next();
+	}
+
+	private static boolean essCertHashValid(SignerInformation signer, CertificateWrapper cert) {
+		return KalkanUtil.signingCertificateV2HashMatches(signer, cert == null ? null : cert.getX509Certificate());
+	}
+
+	/** Извлекает CRL/OCSP из словаря {@code /DSS} документа. */
+	private static AdesVerificationService.EmbeddedRevocation extractDssRevocation(PDDocument document) {
+		List<java.security.cert.X509CRL> crls = new java.util.ArrayList<>();
+		List<byte[]> ocspResponses = new java.util.ArrayList<>();
+		try {
+			var dss = (org.apache.pdfbox.cos.COSDictionary) document.getDocumentCatalog().getCOSObject()
+					.getDictionaryObject(COSName.getPDFName("DSS"));
+			if (dss == null) {
+				return AdesVerificationService.EmbeddedRevocation.empty();
+			}
+			var cf = java.security.cert.CertificateFactory.getInstance("X.509", KalkanProvider.PROVIDER_NAME);
+			var crlArray = (org.apache.pdfbox.cos.COSArray) dss.getDictionaryObject(COSName.getPDFName("CRLs"));
+			if (crlArray != null) {
+				for (int i = 0; i < crlArray.size(); i++) {
+					var stream = (org.apache.pdfbox.cos.COSStream) crlArray.getObject(i);
+					try (var in = stream.createInputStream()) {
+						crls.add((java.security.cert.X509CRL) cf.generateCRL(in));
+					}
+				}
+			}
+			var ocspArray = (org.apache.pdfbox.cos.COSArray) dss.getDictionaryObject(COSName.getPDFName("OCSPs"));
+			if (ocspArray != null) {
+				for (int i = 0; i < ocspArray.size(); i++) {
+					var stream = (org.apache.pdfbox.cos.COSStream) ocspArray.getObject(i);
+					try (var in = stream.createInputStream()) {
+						ocspResponses.add(in.readAllBytes());
+					}
+				}
+			}
+		} catch (Exception e) {
+			log.warn("Cannot extract /DSS revocation: {}", e.getMessage());
+		}
+		return new AdesVerificationService.EmbeddedRevocation(crls, ocspResponses);
+	}
+
 	private PdfSignerInfo verifySignature(PDSignature signature,
 			PdfVerifyRequest pdfVerifyRequest,
 			byte[] originalPdfBytes,
-			Date currentDate) {
+			Date currentDate,
+			boolean hasDss,
+			boolean hasDocTimestamp,
+			AdesVerificationService.EmbeddedRevocation embeddedRevocation) {
 		try {
 			// 1) Extract raw CMS (the /Contents) and the signed content (ByteRange)
 			byte[] signatureContent = signature.getContents();
@@ -301,71 +391,61 @@ public class PdfService {
 			@SuppressWarnings("unchecked")
 			Collection<SignerInformation> signers = signerStore.getSigners();
 
-			boolean valid = false;
+			boolean withOcsp = pdfVerifyRequest.getRevocationCheck()
+					.contains(kz.ncanode.dto.certificate.CertificateRevocation.OCSP);
+			boolean withCrl = pdfVerifyRequest.getRevocationCheck()
+					.contains(kz.ncanode.dto.certificate.CertificateRevocation.CRL);
+
+			// один подписант на PDF-подпись
+			SignerInformation si = signers.isEmpty() ? null : signers.iterator().next();
+
+			CertStore certStore = signedData.getCertificatesAndCRLs("Collection", KalkanProvider.PROVIDER_NAME);
+			X509Certificate x509 = si == null ? null : firstCert(certStore.getCertificates(si.getSID()));
+
 			CertificateWrapper certificateWrapper = null;
+			boolean cmsOk = false;
 			String digestAlgReported = null;
 
-			for (SignerInformation si : signers) {
-				// Load signer certificate from CMS bag
-				CertStore certStore = signedData.getCertificatesAndCRLs("Collection", KalkanProvider.PROVIDER_NAME);
-				Collection<? extends Certificate> certCollection = certStore.getCertificates(si.getSID());
+			var signatureTimestamp = si == null ? Optional.<TimeStampToken>empty()
+					: adesVerificationService.verifiedTimestamp(extractSignatureTimeStamp(si), si.getSignature());
+			Date bestSignatureTime = adesVerificationService.bestSignatureTime(signatureTimestamp, currentDate);
+			var adesLevel = adesVerificationService.detectLevel(signatureTimestamp.isPresent(), hasDss, hasDocTimestamp);
+			var tspInfo = signatureTimestamp.map(t -> adesVerificationService.toTspInfo(t.getTimeStampInfo())).orElse(null);
 
-				if (certCollection == null || certCollection.isEmpty()) {
-					continue;
-				}
-
-				X509Certificate x509 = (X509Certificate) certCollection.iterator().next();
-
-				// 3) Cryptographic verification of CMS signature using Kalkan provider
-				boolean cmsOk = si.verify(x509.getPublicKey(), KalkanProvider.PROVIDER_NAME);
-				if (!cmsOk) {
-					continue;
-				}
-
-				// 4) Trust + revocation validation via your CertificateService
+			if (x509 != null) {
+				cmsOk = si.verify(x509.getPublicKey(), KalkanProvider.PROVIDER_NAME);
 				certificateWrapper = new CertificateWrapper(x509);
-				boolean withOcsp = pdfVerifyRequest.getRevocationCheck()
-						.contains(kz.ncanode.dto.certificate.CertificateRevocation.OCSP);
-				boolean withCrl = pdfVerifyRequest.getRevocationCheck()
-						.contains(kz.ncanode.dto.certificate.CertificateRevocation.CRL);
-
 				certificateService.attachValidationData(certificateWrapper, withOcsp, withCrl);
-
-				boolean chainAndRevoOk = certificateWrapper.isValid(currentDate, withOcsp, withCrl);
-				if (!chainAndRevoOk) {
-					// Keep looping if multiple signer infos exist; otherwise report invalid
-					continue;
-				}
-
-				// If we reached here → both CMS signature and trust checks are OK
-				valid = true;
-
-				// 5) Record digest OID (if you want to surface it)
 				try {
 					digestAlgReported = si.getDigestAlgOID();
 				} catch (Exception ignored) {
-					// leave null if not available
+					// leave null
 				}
-				break;
 			}
 
+			var revocation = certificateWrapper == null
+					? AdesVerificationService.RevocationOutcome.MISSING
+					: adesVerificationService.checkRevocation(certificateWrapper, bestSignatureTime,
+							embeddedRevocation, withOcsp, withCrl);
+
+			var report = adesVerificationService.grade(x509 != null, cmsOk,
+					essCertHashValid(si, certificateWrapper), signatureTimestamp.isPresent(),
+					signatureTimestamp.isPresent(), certificateWrapper, bestSignatureTime, revocation);
+
 			return PdfSignerInfo.builder()
-					.valid(valid)
+					.valid(report.isValid())
 					.reason(signature.getReason())
 					.location(signature.getLocation())
 					.contactInfo(signature.getContactInfo())
 					.signDate(signature.getSignDate() != null ? signature.getSignDate().getTime() : null)
 					.certificate(certificateWrapper != null
-							? certificateWrapper.toCertificateInfo(
-									currentDate,
-									pdfVerifyRequest.getRevocationCheck().contains(
-											kz.ncanode.dto.certificate.CertificateRevocation.OCSP),
-									pdfVerifyRequest.getRevocationCheck().contains(
-											kz.ncanode.dto.certificate.CertificateRevocation.CRL))
+							? certificateWrapper.toCertificateInfo(bestSignatureTime, withOcsp, withCrl)
 							: null)
-					// Keep your current semantics:
-					// - signatureAlgorithm shows PDF SubFilter (structure-level)
-					// - digestAlgorithm shows CMS digest OID (crypto-level)
+					.adesLevel(adesLevel)
+					.tsp(tspInfo)
+					.bestSignatureTime(certificateWrapper != null ? bestSignatureTime : null)
+					.status(report.status())
+					.subIndication(report.subIndication())
 					.signatureAlgorithm(signature.getSubFilter())
 					.digestAlgorithm(digestAlgReported != null ? digestAlgReported : "unknown")
 					.build();
@@ -411,8 +491,8 @@ public class PdfService {
 				if (pades) {
 					// PAdES-B: обязательный signed-атрибут id-aa-signingCertificateV2
 					var table = new java.util.Hashtable<kz.gov.pki.kalkan.asn1.DERObjectIdentifier, kz.gov.pki.kalkan.asn1.cms.Attribute>();
-					var attr = KalkanUtil.signingCertificateV2Attribute(cert);
-					table.put(attr.getAttrType(), attr);
+					var scv2 = KalkanUtil.signingCertificateV2Attribute(cert);
+					table.put(scv2.getAttrType(), scv2);
 					generator.addSigner(privateKey, cert, digestOid,
 							new kz.gov.pki.kalkan.asn1.cms.AttributeTable(table), null);
 				} else {
