@@ -35,9 +35,10 @@ jobs:
           wget -P ./lib "$KALKAN_CRYPT_URL"
           wget -P ./lib "$KALKAN_CRYPT_XMLDSIG_URL"
       - name: Build and Run tests
-        run: ./gradlew build test
+        run: ./gradlew build
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: true
+          files: ./build/reports/jacoco/test/jacocoTestReport.xml
+          fail_ci_if_error: false
