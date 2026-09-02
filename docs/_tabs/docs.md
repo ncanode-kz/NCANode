@@ -14,7 +14,7 @@ icon: fas fa-info-circle
 
 Последнюю версию NCANode можно получить здесь:
 
-[https://github.com/malikzh/NCANode/releases](https://github.com/malikzh/NCANode/releases)
+[https://github.com/ncanode-kz/NCANode/releases](https://github.com/ncanode-kz/NCANode/releases)
 
 ## Запуск NCANode
 
@@ -37,7 +37,7 @@ docker run -p 14579:14579 -v ncanode_cache:/app/cache -d malikzh/ncanode
 
 В отличие, от версий 2.x, 1.x, теперь NCANode настраивается при помощи переменных окружения (os env).
 
-Эти переменные окружения подставляются в конфигурацию в этом файле: [https://github.com/malikzh/NCANode/blob/master/src/main/resources/application.yml](https://github.com/malikzh/NCANode/blob/master/src/main/resources/application.yml)
+Эти переменные окружения подставляются в конфигурацию в этом файле: [https://github.com/ncanode-kz/NCANode/blob/master/src/main/resources/application.yml](https://github.com/ncanode-kz/NCANode/blob/master/src/main/resources/application.yml)
 
 ### Список переменных окружения
 

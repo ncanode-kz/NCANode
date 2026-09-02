@@ -10,15 +10,15 @@ layout: page
 
 <div style="display: flex; height: 100px;align-items: center;justify-content: center;">
     <div>
-        <a class="github-button" href="https://github.com/malikzh/NCANode" data-size="large" data-show-count="true" aria-label="Star malikzh/NCANode on GitHub">Star</a>    
+        <a class="github-button" href="https://github.com/ncanode-kz/NCANode" data-size="large" data-show-count="true" aria-label="Star ncanode-kz/NCANode on GitHub">Star</a>    
     </div>
     <div style="margin-left: 10px;">
-<a class="github-button" href="https://github.com/malikzh/NCANode/fork" data-size="large" data-show-count="true" aria-label="Fork malikzh/NCANode on GitHub">Fork</a>    
+<a class="github-button" href="https://github.com/ncanode-kz/NCANode/fork" data-size="large" data-show-count="true" aria-label="Fork ncanode-kz/NCANode on GitHub">Fork</a>    
 </div>
 
  <div style="margin-left: 10px;">
 <!-- Place this tag where you want the button to render. -->
-<a class="github-button" href="https://github.com/malikzh/NCANode/releases" download data-icon="octicon-download" data-size="large" aria-label="Download malikzh/NCANode on GitHub">Download</a>
+<a class="github-button" href="https://github.com/ncanode-kz/NCANode/releases" download data-icon="octicon-download" data-size="large" aria-label="Download ncanode-kz/NCANode on GitHub">Download</a>
 </div>
 </div>
 
@@ -26,10 +26,10 @@ layout: page
 
 <div style="display: flex; justify-content: center;">
     <div style="margin: 0 5px;"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="License:MIT"></div>
-    <div style="margin: 0 5px;"><img src="https://img.shields.io/github/downloads/malikzh/NCANode/total.svg" alt="Docker Pulls"></div>
-    <div style="margin: 0 5px;"><a href="https://github.com/malikzh/NCANode/actions/workflows/build-ci.yml" target="_blank"><img src="https://github.com/malikzh/NCANode/actions/workflows/build-ci.yml/badge.svg" alt="Build CI and Test"></a></div>
-    <div style="margin: 0 5px;"><img src="https://img.shields.io/github/v/release/malikzh/NCANode" alt="GitHub release (latest SemVer)"></div>
-    <div style="margin: 0 5px;"><a href="https://codecov.io/gh/malikzh/NCANode" target="_blank"><img src="https://codecov.io/gh/malikzh/NCANode/branch/master/graph/badge.svg?token=yk6ln3mlTB" alt="Build CI and Test"></a></div>
+    <div style="margin: 0 5px;"><img src="https://img.shields.io/github/downloads/ncanode-kz/NCANode/total.svg" alt="Docker Pulls"></div>
+    <div style="margin: 0 5px;"><a href="https://github.com/ncanode-kz/NCANode/actions/workflows/build-ci.yml" target="_blank"><img src="https://github.com/ncanode-kz/NCANode/actions/workflows/build-ci.yml/badge.svg" alt="Build CI and Test"></a></div>
+    <div style="margin: 0 5px;"><img src="https://img.shields.io/github/v/release/ncanode-kz/NCANode" alt="GitHub release (latest SemVer)"></div>
+    <div style="margin: 0 5px;"><a href="https://codecov.io/gh/ncanode-kz/NCANode" target="_blank"><img src="https://codecov.io/gh/ncanode-kz/NCANode/branch/master/graph/badge.svg?token=yk6ln3mlTB" alt="Build CI and Test"></a></div>
 </div>
 
 ---
@@ -95,8 +95,8 @@ https://profit.kz/news/56732/Otkritij-kod-Beeline-Hacktoberfest-v-Kazahstane/
 
 ## Contributors
 
-<a href="https://github.com/malikzh/NCANode/graphs/contributors">
-  <img src="https://contributors-img.web.app/image?repo=malikzh/NCANode" />
+<a href="https://github.com/ncanode-kz/NCANode/graphs/contributors">
+  <img src="https://contributors-img.web.app/image?repo=ncanode-kz/NCANode" />
 </a>
 
 ## Лицензия

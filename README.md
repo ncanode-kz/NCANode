@@ -7,11 +7,11 @@
 ---
 
 ![License:MIT](https://img.shields.io/badge/license-MIT-green.svg)
-![Downloads](https://img.shields.io/github/downloads/malikzh/NCANode/total.svg)
+![Downloads](https://img.shields.io/github/downloads/ncanode-kz/NCANode/total.svg)
 ![Docker Pulls](https://img.shields.io/docker/pulls/malikzh/ncanode)
-[![Build CI and Test](https://github.com/malikzh/NCANode/actions/workflows/build-ci.yml/badge.svg)](https://github.com/malikzh/NCANode/actions/workflows/build-ci.yml)
-![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/malikzh/NCANode)
-[![codecov](https://codecov.io/gh/malikzh/NCANode/branch/master/graph/badge.svg?token=yk6ln3mlTB)](https://codecov.io/gh/malikzh/NCANode)
+[![Build CI and Test](https://github.com/ncanode-kz/NCANode/actions/workflows/build-ci.yml/badge.svg)](https://github.com/ncanode-kz/NCANode/actions/workflows/build-ci.yml)
+![GitHub release (latest SemVer)](https://img.shields.io/github/v/release/ncanode-kz/NCANode)
+[![codecov](https://codecov.io/gh/ncanode-kz/NCANode/branch/master/graph/badge.svg?token=yk6ln3mlTB)](https://codecov.io/gh/ncanode-kz/NCANode)
 
 ---
 
@@ -89,8 +89,8 @@ Swagger: https://v3.ncanode.kz/swagger-ui/
 
 ## Contributors
 
-<a href="https://github.com/malikzh/NCANode/graphs/contributors">
-  <img src="https://contributors-img.web.app/image?repo=malikzh/NCANode" />
+<a href="https://github.com/ncanode-kz/NCANode/graphs/contributors">
+  <img src="https://contributors-img.web.app/image?repo=ncanode-kz/NCANode" />
 </a>
 
 ## Лицензия
