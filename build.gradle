@@ -11,8 +11,9 @@ group 'kz'
 version project.hasProperty('version') ? version : '3.0.0-SNAPSHOT'
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_25
-    targetCompatibility = JavaVersion.VERSION_25
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
 }
 
 configurations {
