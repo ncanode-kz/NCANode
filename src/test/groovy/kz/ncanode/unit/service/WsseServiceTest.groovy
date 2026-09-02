@@ -144,6 +144,35 @@ ngGRfppW9X6JHGjv5s7WO7Y+YPB9gqeN71+Huw==
         'invalid date' | XML_SIGNED_STRING | false     | false    | false     || false
     }
 
+    def "verify returns invalid for a SOAP envelope without a signature"() {
+        given:
+        def soap = '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">' +
+            '<soapenv:Body><ping/></soapenv:Body></soapenv:Envelope>'
+
+        when:
+        def response = wsseService.verify(soap, false, false)
+
+        then:
+        !response.valid
+        response.signers.isEmpty()
+    }
+
+    def "sign with trimXml still yields a signature"() {
+        given:
+        def request = WsseSignRequest.builder()
+            .xml(XML_VALID_STRING)
+            .key(KEY_INDIVIDUAL_VALID_2015)
+            .password(KEY_INDIVIDUAL_VALID_2015_PASSWORD)
+            .trimXml(true)
+            .build()
+
+        when:
+        def response = wsseService.sign(request)
+
+        then:
+        response.xml.contains('ds:SignatureValue')
+    }
+
     private CertificateWrapper mockIssuerCertificate(boolean dateValid) {
         def cert = mock(CertificateWrapper)
         when(cert.isDateValid(any())).thenReturn(dateValid)

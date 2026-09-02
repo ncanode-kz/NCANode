@@ -149,6 +149,33 @@ class PdfServiceTest extends Specification implements WithTestData {
         'invalid issuer'     | false     | Set.of()                                                       || false
     }
 
+    @Unroll("#file")
+    def "verify the reference PAdES fixtures (exercises the /DSS revocation reader)"() {
+        given:
+        def issuer = mockIssuerCertificate(true)
+        when(certificateService.getCurrentDate())
+            .thenReturn(Date.from(java.time.Instant.parse('2026-09-02T11:00:00Z')))
+        when(certificateService.attachValidationData(any(), anyBoolean(), anyBoolean()))
+            .thenAnswer(new CertificateServiceAnswer(issuer))
+
+        def request = PdfVerifyRequest.builder()
+            .pdf(Base64.encoder.encodeToString(
+                org.springframework.util.ResourceUtils.getFile("classpath:pades/${file}").bytes))
+            .build()
+
+        when:
+        def response = pdfService.verify(request)
+
+        then:
+        response != null
+        response.signers.size() == 1
+        response.signers[0].certificate != null
+
+        where:
+        file << ['sample-signed-b.pdf', 'sample-signed-t.pdf',
+                 'sample-signed-lt.pdf', 'sample-signed-lta.pdf']
+    }
+
     def "test pdf verification without signatures"() {
         given:
         def request = PdfVerifyRequest.builder()

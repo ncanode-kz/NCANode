@@ -26,6 +26,15 @@ class CertificateServiceTest extends Specification implements WithTestData {
         result.signers.size() == 1
     }
 
+    def "info with an empty certificate list is invalid"() {
+        when:
+        def result = certificateService.info([], false, false)
+
+        then:
+        !result.valid
+        result.signers.isEmpty()
+    }
+
     def "invalid certificate info method"() {
         given:
         def certs = [

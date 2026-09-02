@@ -134,25 +134,6 @@ public class XadesSignatureWrapper {
     }
 
     /**
-     * Извлекает {@code EncapsulatedTimeStamp} из {@code xades:SignatureTimeStamp} — для разбора genTime
-     * и цепочки TSA при построении XAdES-LT.
-     *
-     * @return DER-кодированный TimeStampToken, либо {@code null}, если метки нет
-     */
-    public byte[] getSignatureTimeStampToken() {
-        final Element usp = existingUnsignedSignatureProperties();
-        if (usp == null) {
-            return null;
-        }
-        final Element timeStamp = firstChild(usp, "SignatureTimeStamp");
-        if (timeStamp == null) {
-            return null;
-        }
-        final Element encapsulated = firstChild(timeStamp, "EncapsulatedTimeStamp");
-        return encapsulated == null ? null : Base64.getMimeDecoder().decode(encapsulated.getTextContent().trim());
-    }
-
-    /**
      * Вшивает {@code xades:CertificateValues} и {@code xades:RevocationValues} (уровень XAdES-LT).
      */
     public void attachValidationData(List<X509Certificate> certificates, List<byte[]> crls, List<byte[]> ocsps) {

@@ -1,5 +1,6 @@
 package kz.ncanode.service;
 
+import kz.ncanode.annotation.Generated;
 import kz.ncanode.configuration.CaConfiguration;
 import kz.ncanode.dto.crl.CrlResult;
 import kz.ncanode.exception.CaException;
@@ -198,11 +199,13 @@ public class CaService {
         }
     }
 
+    @Generated // недостижимо в тестах: завершает процесс
     private void shutdown() {
         SpringApplication.exit(applicationContext, () -> EXIT_CODE);
         System.exit(EXIT_CODE);
     }
 
+    @Generated // ветка null ведёт к shutdown() — недостижимо в тестах
     private void checkCertForNull(final Map.Entry<String, URL> urlEntry, final CertificateWrapper cert, final File caFile) {
         if (cert == null) {
             log.error("Cannot open CA certificate from: '{}'. File name: {}", urlEntry.getValue().toString(), caFile.getAbsolutePath());

@@ -5,14 +5,19 @@ import kz.ncanode.common.WithTestData
 import kz.ncanode.dto.request.CmsCreateRequest
 import kz.ncanode.dto.request.SignerRequest
 import kz.ncanode.exception.ClientException
+import kz.ncanode.dto.request.CmsExtendRequest
+import kz.ncanode.dto.ades.AdesLevel
+import kz.ncanode.exception.ServerException
 import kz.ncanode.service.CertificateService
 import kz.ncanode.service.CmsService
+import kz.ncanode.service.TspService
 import kz.ncanode.wrapper.CertificateWrapper
 import org.mockito.invocation.InvocationOnMock
 import org.mockito.stubbing.Answer
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.mock.mockito.MockBean
+import org.springframework.boot.test.mock.mockito.SpyBean
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -20,6 +25,7 @@ import java.nio.charset.StandardCharsets
 
 import static org.mockito.ArgumentMatchers.any
 import static org.mockito.ArgumentMatchers.anyBoolean
+import static org.mockito.Mockito.doAnswer
 import static org.mockito.Mockito.mock
 import static org.mockito.Mockito.when
 
@@ -36,6 +42,9 @@ class CmsServiceTest extends Specification implements WithTestData {
 
     @MockBean
     CertificateService certificateService
+
+    @SpyBean
+    TspService tspService
 
     @Unroll("#caseName")
     def "test cms creating"() {
@@ -139,6 +148,146 @@ class CmsServiceTest extends Specification implements WithTestData {
 
         then:
         thrown(ClientException)
+    }
+
+    def "extract wraps a malformed CMS in a ServerException"() {
+        when:
+        cmsService.extract('bm90IGEgY21z')
+
+        then:
+        thrown(ServerException)
+    }
+
+    def "verify rejects a malformed CMS"() {
+        when:
+        cmsService.verify('bm90IGEgY21z', null, false, false)
+
+        then:
+        thrown(ClientException)
+    }
+
+    def "addSigners rejects a request without a CMS"() {
+        given:
+        def request = new CmsCreateRequest()
+        request.setSigners([new SignerRequest(KEY_INDIVIDUAL_VALID_2015, KEY_INDIVIDUAL_VALID_2015_PASSWORD, null, null)])
+
+        when:
+        cmsService.addSigners(request)
+
+        then:
+        thrown(ClientException)
+    }
+
+    def "addSigners rejects a CAdES profile for co-signing"() {
+        given:
+        def request = new CmsCreateRequest()
+        request.setCms(SIGNED_CMS_ONE_SIGNER)
+        request.setCadesLevel(AdesLevel.T)
+        request.setSigners([new SignerRequest(KEY_INDIVIDUAL_VALID_2015, KEY_INDIVIDUAL_VALID_2015_PASSWORD, null, null)])
+
+        when:
+        cmsService.addSigners(request)
+
+        then:
+        thrown(ClientException)
+    }
+
+    def "addSigners rejects a detached CMS without data"() {
+        given:
+        def request = new CmsCreateRequest()
+        request.setCms(SIGNED_DETACHED_CMS)
+        request.setDetached(true)
+        request.setSigners([new SignerRequest(KEY_INDIVIDUAL_VALID_2015, KEY_INDIVIDUAL_VALID_2015_PASSWORD, null, null)])
+
+        when:
+        cmsService.addSigners(request)
+
+        then:
+        thrown(ClientException)
+    }
+
+    def "addSigners with TSP timestamps only the newly added signer"() {
+        given: 'tsp returns the signer untouched so we do not hit the network'
+        doAnswer({ InvocationOnMock inv -> inv.getArgument(0) })
+            .when(tspService).addTspToSigner(any(), any(), any())
+
+        def request = new CmsCreateRequest()
+        request.setData(Base64.getEncoder().encodeToString(TEST_DATA.getBytes(StandardCharsets.UTF_8)))
+        request.setCms(SIGNED_CMS_ONE_SIGNER)
+        request.setWithTsp(true)
+        request.setSigners([new SignerRequest(KEY_INDIVIDUAL_VALID_2015, KEY_INDIVIDUAL_VALID_2015_PASSWORD, null, null)])
+
+        when:
+        def response = cmsService.addSigners(request)
+
+        then:
+        getSignersQuantity(new CMSSignedData(Base64.decoder.decode(response.cms))) == 2
+    }
+
+    def "extend rejects a detached CMS without data"() {
+        given:
+        def request = new CmsExtendRequest(cms: SIGNED_DETACHED_CMS, cadesLevel: AdesLevel.T)
+
+        when:
+        cmsService.extend(request)
+
+        then:
+        thrown(ClientException)
+    }
+
+    def "create with TSP timestamps every signer"() {
+        given:
+        doAnswer({ InvocationOnMock inv -> inv.getArgument(0) })
+            .when(tspService).addTspToSigner(any(), any(), any())
+
+        def request = new CmsCreateRequest()
+        request.setData(Base64.getEncoder().encodeToString(TEST_DATA.getBytes(StandardCharsets.UTF_8)))
+        request.setWithTsp(true)
+        request.setSigners([new SignerRequest(KEY_INDIVIDUAL_VALID_2015, KEY_INDIVIDUAL_VALID_2015_PASSWORD, null, null)])
+
+        when:
+        def response = cmsService.create(request)
+
+        then:
+        getSignersQuantity(new CMSSignedData(Base64.decoder.decode(response.cms))) == 1
+    }
+
+    def "create wraps a key failure in a ServerException"() {
+        given:
+        def request = new CmsCreateRequest()
+        request.setData(Base64.getEncoder().encodeToString(TEST_DATA.getBytes(StandardCharsets.UTF_8)))
+        request.setSigners([new SignerRequest(KEY_INVALID, KEY_INVALID_PASSWORD, null, null)])
+
+        when:
+        cmsService.create(request)
+
+        then:
+        thrown(ServerException)
+    }
+
+    def "extend accepts a detached CMS together with its data"() {
+        given:
+        def request = new CmsExtendRequest(
+            cms: SIGNED_DETACHED_CMS,
+            data: Base64.encoder.encodeToString(TEST_DATA.getBytes(StandardCharsets.UTF_8)),
+            cadesLevel: AdesLevel.B)
+
+        when:
+        def response = cmsService.extend(request)
+
+        then:
+        new CMSSignedData(Base64.decoder.decode(response.cms)).signedContent == null
+    }
+
+    def "extend at level B returns the CMS unchanged"() {
+        given:
+        def request = new CmsExtendRequest(cms: SIGNED_CMS_ONE_SIGNER, cadesLevel: AdesLevel.B)
+
+        when:
+        def response = cmsService.extend(request)
+
+        then:
+        getSignersQuantity(new CMSSignedData(Base64.decoder.decode(response.cms))) == 1
     }
 
     private boolean checkOriginalData(CMSSignedData cms, boolean detached) {
