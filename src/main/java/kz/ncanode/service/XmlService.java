@@ -1,10 +1,18 @@
 package kz.ncanode.service;
 
+import kz.gov.pki.kalkan.tsp.TimeStampToken;
+import kz.ncanode.dto.request.SignerRequest;
 import kz.ncanode.dto.request.XmlSignRequest;
 import kz.ncanode.dto.response.VerificationResponse;
 import kz.ncanode.dto.response.XmlSignResponse;
+import kz.ncanode.dto.tsp.TsaPolicy;
+import kz.ncanode.dto.xades.XadesType;
 import kz.ncanode.exception.ClientException;
+import kz.ncanode.exception.ServerException;
+import kz.ncanode.util.KalkanUtil;
 import kz.ncanode.wrapper.*;
+
+import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import lombok.val;
@@ -31,6 +39,7 @@ import java.util.*;
 public class XmlService {
     private final KalkanWrapper kalkanWrapper;
     private final CertificateService certificateService;
+    private final TspService tspService;
 
     /**
      * Read XML from String
@@ -70,13 +79,67 @@ public class XmlService {
         int i = 0;
 
         for (KeyStoreWrapper keyStore : kalkanWrapper.read(xmlSignRequest.getSigners())) {
-            document.createXmlSignature(keyStore.getCertificate(), xmlSignRequest.getSigners().get(i++).getReferenceUri())
-                .sign(keyStore.getPrivateKey());
+            final SignerRequest signer = xmlSignRequest.getSigners().get(i++);
+
+            if (xmlSignRequest.getXadesType() == null) {
+                document.createXmlSignature(keyStore.getCertificate(), signer.getReferenceUri())
+                    .sign(keyStore.getPrivateKey());
+            } else {
+                signXades(document, keyStore, signer, xmlSignRequest.getXadesType(), xmlSignRequest.getTsaPolicy());
+            }
         }
 
         return XmlSignResponse.builder()
             .xml(document.toString())
             .build();
+    }
+
+    /**
+     * Подписывает документ по профилю XAdES: BES → T → LT → LTA (каждый следующий включает предыдущий).
+     */
+    private void signXades(DocumentWrapper document, KeyStoreWrapper keyStore, SignerRequest signer,
+                           XadesType xadesType, TsaPolicy tsaPolicy) {
+        final CertificateWrapper certificate = keyStore.getCertificate();
+        final String imprintDigest = KalkanUtil.getXadesTspImprintDigest(
+            certificate.getX509Certificate().getSigAlgOID());
+
+        final XadesSignatureWrapper xades = new XadesSignatureWrapper(document, certificate, signer.getReferenceUri());
+        xades.sign(keyStore.getPrivateKey());
+
+        if (xadesType == XadesType.XADES_BES) {
+            return;
+        }
+
+        // XAdES-T: метка времени на ds:SignatureValue
+        final TimeStampToken signatureTimeStamp = tspService.create(
+            xades.getCanonicalizedSignatureValue(), imprintDigest, tsaPolicy.getPolicyId());
+        xades.attachSignatureTimeStamp(encoded(signatureTimeStamp));
+
+        if (xadesType == XadesType.XADES_T) {
+            return;
+        }
+
+        // XAdES-LT: вшиваем цепочку и данные отзыва
+        final var validationData = certificateService.collectXadesValidationData(
+            certificate, tspService.extractCertificates(signatureTimeStamp));
+        xades.attachValidationData(validationData.certificates(), validationData.crls(), validationData.ocsps());
+
+        if (xadesType == XadesType.XADES_LT) {
+            return;
+        }
+
+        // XAdES-LTA: архивная метка времени
+        final TimeStampToken archiveTimeStamp = tspService.create(
+            xades.getArchiveTimeStampImprintData(), imprintDigest, tsaPolicy.getPolicyId());
+        xades.attachArchiveTimeStamp(encoded(archiveTimeStamp));
+    }
+
+    private static byte[] encoded(TimeStampToken token) {
+        try {
+            return token.getEncoded();
+        } catch (IOException e) {
+            throw new ServerException("Timestamp token encoding error", e);
+        }
     }
 
     /**

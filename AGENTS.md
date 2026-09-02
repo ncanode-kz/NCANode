@@ -1,0 +1,107 @@
+# AGENTS.md
+
+Guidance for AI coding agents (Claude Code, etc.) working in this repository.
+`CLAUDE.md` points here; this file is the source of truth.
+
+## About
+
+NCANode — сервер (Spring Boot 3.5, Java 25, Gradle 9) для работы с ЭЦП Республики Казахстан: подпись и проверка XML (xmldsig), CMS, PDF, WSSE (SmartBridge), JWT, проверка сертификатов через OCSP/CRL, TSP-метки. REST API на JSON, порт по умолчанию 14579.
+
+## Build & Run
+
+Требуются проприетарные библиотеки KalkanCrypt (`knca_provider_jce_kalkan-*.jar`, `kalkancrypt-xmldsig-*.jar`) в директории `lib/` — Gradle подключает их через flatDir-репозиторий. Без них проект не соберётся; их можно запросить на https://pki.gov.kz/developers/.
+
+```bash
+./gradlew bootRun            # запуск без сборки
+./gradlew bootJar            # сборка jar -> build/libs/NCANode.jar
+./gradlew bootWar            # сборка war
+```
+
+Проверка после запуска: http://localhost:14579/actuator/health, Swagger UI: `/swagger-ui/`.
+
+Вся конфигурация — через переменные окружения `NCANODE_*` (см. `src/main/resources/application.yml`): порт, URL-ы CRL/OCSP/TSP/CA, прокси, каталог кэша (`NCANODE_CACHE_DIR`, по умолчанию `./cache`), `NCANODE_DEBUG` для детальных ошибок.
+
+## Tests
+
+Тесты написаны на Spock (Groovy), лежат в `src/test/groovy`:
+
+```bash
+./gradlew test                                                    # все тесты
+./gradlew test --tests 'kz.ncanode.unit.service.CmsServiceTest'   # один класс
+./gradlew test --tests '*CmsServiceTest' --tests '*XmlServiceTest'
+./gradlew check                                                   # тесты + jacoco-отчёт
+```
+
+- `unit/` — юнит-тесты сервисов и wrapper'ов.
+- `integration/` — тесты контроллеров через standalone MockMvc; базовый класс `common/IntegrationSpecification.groovy` (метод `doPostQuery`), тестовые ключи/данные — в `common/WithTestData.groovy` и `src/test/resources` (ca, certs, crl, ocsp, tsp).
+
+`check` зависит от `jacocoTestReport`; из покрытия исключены dto, configuration, constants, exception, util.
+
+### Тесты не должны зависеть от текущего времени
+
+Тестовые ключи и сертификаты имеют срок действия, а CRL/OCSP-ответы — окно валидности. Тест, который проверяет подпись/цепочку «на `new Date()`», начнёт падать, как только сертификат протухнет или CRL устареет.
+
+- Валидацию по времени прогонять на **фиксированную дату внутри срока действия** тестового сертификата, а не на «сейчас». Пробрасывать время параметром / через `Clock`, не звать `new Date()` / `Instant.now()` в проверяемом коде без возможности подмены.
+- Для проверки существующих подписей-эталонов (`xades-test-signed-*.xml` и т.п.) фиксировать validation time на момент подписания из самого файла (`SigningTime`) либо на заведомо валидную дату.
+- Ассерты вида «подпись валидна сегодня» — запрещены; только «подпись валидна на дату T».
+
+### Тестовые ключи
+
+GOST-2015 (действующий на 2026–2027):
+`/Users/malikzh/Downloads/SDK/SDK/SDK/SDK 2.0/Keys and Certs/Gost2015/2026.05.08-2027.05.07/Физическое лицо/valid/GOST512_ec425659bd2fc6dc587b871aede1857727cf8451.p12`
+пароль `Qwerty12`. Это тот ключ, которым созданы эталоны `xades-test-signed-*.xml` (субъект `ТЕСТОВ ТЕСТ`, IIN123456789011, УЦ `... (GOST) TEST 2022`, CDP `http://test.pki.gov.kz/crl/nca_gost2022_test.crl`).
+
+Прочие тестовые ключи (Base64 PKCS12) и их пароли/алиасы — в `WithTestData.groovy` (`KEY_INDIVIDUAL_VALID_2015` и др.).
+
+## XAdES / CAdES / PAdES (LT / LTA) — work in progress
+
+Задача: выдавать не голый xmldsig/CMS-with-TSP, а профили ETSI **B / T / LT / LTA** (клиентский запрос про «профили A, B, LT, LTA и XAdES»).
+
+**Статус реализации:**
+- XAdES **BES / T / LT / LTA** для `/xml/sign` — готово. `XmlSignRequest.xadesType`
+  (`XADES_BES`/`XADES_T`/`XADES_LT`/`XADES_LTA`, `null` = обычный XMLDSIG) + `tsaPolicy`.
+  Оркестрация — `XmlService.signXades` (каждый уровень включает предыдущий):
+  - BES/T/архивная метка — `wrapper/XadesSignatureWrapper` (Santuario + Kalkan), TSP через `TspService`.
+  - LT-материал — `CertificateService.collectXadesValidationData`: цепочка через `CaService.buildChain`,
+    OCSP-в-DER через `OcspService.getRawResponses`, CRL-в-DER через `CrlService.getEncodedCrlsFor`,
+    сертификаты TSA через `TspService.extractCertificates`.
+  - Имприт `xades141:ArchiveTimeStamp` — `XadesSignatureWrapper.getArchiveTimeStampImprintData` (порядок 1:1 с движком NCALayer).
+  Все 4 уровня из NCANode проходят `ValidationReport[VALID]` в движке NCALayer (`VerifyXades.java` в `scratchpad/ltref`).
+  Если нет ни OCSP, ни CRL для цепочки — LT/LTA отдаёт `ClientException`.
+- CAdES / PAdES уровней T/LT/LTA — не начато.
+
+Референс — движок `kz.gov.pki.ades` из NCALayer (`knca_provider_util 0.9`, бандл `bundle23`), декомпилированный в `scratchpad` сессии. Ключевые факты:
+
+- XAdES: exclusive-c14n везде, ns `http://uri.etsi.org/01903/v1.3.2#` (+ `v1.4.1#` для `ArchiveTimeStamp`/`TimeStampValidationData`), `SigningCertificateV2`/`IssuerSerialV2` (ESS v2), `SignedDataObjectProperties/DataObjectFormat`.
+- `applyLevel`: `T` → `xades:SignatureTimeStamp` на `exc-c14n(ds:SignatureValue)`; `LT` → `xades:CertificateValues` + `xades:RevocationValues` (цепочка + OCSP-в-полном-`OCSPResponse` + CRL, на момент genTime метки времени); `LTA` → `xades141:ArchiveTimeStamp` + `TimeStampValidationData`.
+- LT собирает отзыв фатально по цепочке подписанта и не-фатально по цепочке TSA.
+- Порядок конкатенации канонизованных узлов для имприта `ArchiveTimeStamp` — см. `XadesSignatureService.archiveTimeStampImprintData` (самое хрупкое место, копировать 1:1).
+- CAdES: unsigned-атрибуты `id-aa-signatureTimeStampToken`, `id-aa-ets-certValues`, `id-aa-ets-revocationValues`, `id-aa-ets-archiveTimestampV3`. PAdES: `/DSS` + `/VRI` + DocTimeStamp.
+
+Формат XAdES (GOST-2015-512, УЦ `... (GOST) TEST 2022`, enveloped):
+- Порядок в `RevocationValues`: `CRLValues` затем `OCSPValues`; OCSP-ответ — полный DER `OCSPResponse`.
+- `CertificateValues` = подписант + промежуточный + корневой (+ сертификаты TSA).
+- LTA = LT + `xades141:ArchiveTimeStamp` (собственный `xmlns:xades141`).
+
+Эталоны: `src/test/resources/xades/xades-test-signed-{b,t,lt,lta}.xml` (+ исходник `xades-test.xml`).
+`XadesFixtureSpec` проверяет их валидность на **фиксированную** дату `2026-09-02T11:00:00Z`
+(= 2026-09-02 16:00 UTC+5): крипто-подпись, `CertDigest`, срок действия сертификата, метка времени
+(imprint над c14n `ds:SignatureValue`), актуальность вшитых CRL, наличие архивной метки для LTA.
+Дата фиксирована намеренно — «валидно на `new Date()`» протухнет с истечением сертификата/CRL.
+
+Кросс-проверка: `scratchpad`-сессии, `ltref/` — `GenXades.java` генерирует эталоны прогоном движка
+NCALayer `kz.gov.pki.ades` напрямую (бандлы `kalkan`/`ades`/`xmldsig` + `StaticCrlSource`/`OnlineOcspSource`,
+минуя баг pki.gov.kz с URL загрузки CRL); `VerifyXades.java` валидирует произвольный XAdES-XML этим же движком.
+Материал УЦ (fresh CRL, root) — `test.pki.gov.kz` / `crl.root.gov.kz`.
+
+## Architecture
+
+Слои: **controller → service → wrapper**.
+
+- `controller/` — REST-контроллеры, по одному на область API: `xml`, `cms`, `pdf`, `wsse`, `jwt`, `jws`, `pkcs12`, `x509` (эндпоинты вида `/xml/sign`, `/cms/verify` и т.д.). `jws` — подпись/проверка произвольного JSON (`/jws/sign`, `/jws/verify`), compact serialization, без семантики claim'ов JWT. Ошибки централизованно обрабатывает `controller/advice/ExceptionHandlerControllerAdvice`.
+- `service/` — бизнес-логика подписи/проверки. `CertificateService` — центральная точка валидации сертификатов: собирает цепочку через `CaService` и статусы отзыва через `OcspService`/`CrlService`. `CaService` и `CrlService` кэшируют корневые сертификаты и CRL-файлы на диск (`cacheDir`) и обновляют кэш по расписанию с TTL из конфигурации. `TspService` использует spring-retry.
+- `wrapper/` — обёртки над KalkanCrypt/JCA API: `KalkanWrapper` (чтение PKCS12-ключей из Base64, преобразование ошибок Kalkan в понятные сообщения), `KeyStoreWrapper`, `CertificateWrapper`, `DocumentWrapper`, `XMLSignatureWrapper`. Прямую работу с Kalkan-провайдером держать здесь, а не в сервисах.
+- `dto/request` и `dto/response` — модели API; ключи подписантов приходят в запросах как Base64 PKCS12 (`SignerRequest`: key, password, keyAlias).
+- `configuration/` — `@ConfigurationProperties`-классы под секции `ncanode.*` из application.yml.
+
+Тексты ошибок — в `constants/MessageConstants`; наружу отдаются только они, без деталей от Kalkan (кроме режима `detailedErrors`).

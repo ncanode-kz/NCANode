@@ -80,6 +80,41 @@ public class OcspService {
         return statuses;
     }
 
+    /**
+     * Запрашивает OCSP-ответы для сертификата и возвращает их в DER (полный {@code OCSPResponse}).
+     * Для вшивания в XAdES-LT. Ответы со статусом != 0 и ошибки транспорта отбрасываются.
+     *
+     * @param cert   проверяемый сертификат
+     * @param issuer сертификат издателя
+     * @return список DER-кодированных {@code OCSPResponse} (может быть пустым)
+     */
+    public List<byte[]> getRawResponses(CertificateWrapper cert, CertificateWrapper issuer) {
+        final List<byte[]> responses = new ArrayList<>();
+
+        if (issuer == null) {
+            return responses;
+        }
+
+        for (Map.Entry<String, URL> entry : ocspConfiguration.getUrlList().entrySet()) {
+            try {
+                byte[] nonce = generateOcspNonce();
+                OCSPReq request = buildOcspRequest(cert.getX509Certificate().getSerialNumber(), issuer.getX509Certificate(), nonce);
+
+                try (CloseableHttpResponse response = makeRequest(entry.getValue().toString(), request.getEncoded())) {
+                    byte[] responseBytes = response.getEntity().getContent().readAllBytes();
+
+                    if (new OCSPResp(responseBytes).getStatus() == 0) {
+                        responses.add(responseBytes);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("OCSP fetch for XAdES-LT failed ({}): {}", entry.getValue(), e.getMessage());
+            }
+        }
+
+        return responses;
+    }
+
     private OCSPReq buildOcspRequest(BigInteger serialNumber, X509Certificate issuer, byte[] nonce) throws OCSPException {
         final OCSPReqGenerator ocspReqGenerator = new OCSPReqGenerator();
         CertificateID certId = new CertificateID(CertificateID.HASH_SHA256, issuer, serialNumber, kalkanProvider.getName());

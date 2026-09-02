@@ -8,6 +8,8 @@ import kz.ncanode.dto.request.Pkcs12InfoRequest;
 import kz.ncanode.dto.request.SbaSignRequest;
 import kz.ncanode.dto.response.SbaSignResponse;
 import kz.ncanode.dto.response.VerificationResponse;
+import kz.ncanode.dto.xades.XadesValidationData;
+import kz.ncanode.exception.ClientException;
 import kz.ncanode.exception.ServerException;
 import kz.ncanode.wrapper.CertificateWrapper;
 import kz.ncanode.wrapper.KalkanWrapper;
@@ -39,6 +41,83 @@ public class CertificateService {
 
     public Date getCurrentDate() {
         return new Date();
+    }
+
+    /**
+     * Собирает материал для XAdES-LT: полную цепочку сертификатов подписанта (+ сертификаты TSA)
+     * и данные отзыва (OCSP для конечного сертификата, CRL для УЦ).
+     *
+     * @param signer      сертификат подписанта
+     * @param extraCerts  дополнительные сертификаты (например, цепочка TSA из метки времени)
+     * @return материал для вшивания
+     */
+    public XadesValidationData collectXadesValidationData(CertificateWrapper signer, List<X509Certificate> extraCerts) {
+        final List<CertificateWrapper> chain = caService.buildChain(signer);
+        final List<X509Certificate> certificates = new ArrayList<>();
+        final List<byte[]> crls = new ArrayList<>();
+        final List<byte[]> ocsps = new ArrayList<>();
+
+        chain.forEach(c -> addDistinct(certificates, c.getX509Certificate()));
+        extraCerts.forEach(c -> addDistinct(certificates, c));
+
+        // Конечный сертификат: OCSP, при неудаче — CRL.
+        final CertificateWrapper issuer = chain.size() > 1 ? chain.get(1) : null;
+        final List<byte[]> signerOcsp = ocspService.getRawResponses(signer, issuer);
+
+        if (!signerOcsp.isEmpty()) {
+            signerOcsp.forEach(o -> addDistinct(ocsps, o));
+        } else {
+            crlService.getEncodedCrlsFor(signer.getX509Certificate()).forEach(c -> addDistinct(crls, c));
+        }
+
+        // Промежуточные УЦ (без корня): CRL из кэша.
+        for (int i = 1; i < chain.size(); i++) {
+            final CertificateWrapper ca = chain.get(i);
+
+            if (ca.getIssuerX500Principal().equals(ca.getSubjectX500Principal())) {
+                continue;
+            }
+
+            crlService.getEncodedCrlsFor(ca.getX509Certificate()).forEach(c -> addDistinct(crls, c));
+        }
+
+        // Сертификаты TSA (best-effort): CRL их издателя.
+        for (final X509Certificate tsa : extraCerts) {
+            if (tsa.getIssuerX500Principal().equals(tsa.getSubjectX500Principal())) {
+                continue;
+            }
+
+            crlService.getEncodedCrlsFor(tsa).forEach(c -> addDistinct(crls, c));
+        }
+
+        final XadesValidationData data = new XadesValidationData(certificates, crls, ocsps);
+
+        if (!data.hasRevocation()) {
+            throw new ClientException("Cannot build XAdES-LT: no OCSP or CRL data available for the signer chain. "
+                + "Configure NCANODE_OCSP_URL / NCANODE_CRL_URL / NCANODE_CA_CRL_URL.");
+        }
+
+        return data;
+    }
+
+    private static void addDistinct(List<byte[]> list, byte[] value) {
+        if (list.stream().noneMatch(existing -> Arrays.equals(existing, value))) {
+            list.add(value);
+        }
+    }
+
+    private static void addDistinct(List<X509Certificate> list, X509Certificate value) {
+        try {
+            final byte[] encoded = value.getEncoded();
+            for (final X509Certificate existing : list) {
+                if (Arrays.equals(existing.getEncoded(), encoded)) {
+                    return;
+                }
+            }
+            list.add(value);
+        } catch (CertificateException e) {
+            list.add(value);
+        }
     }
 
     public VerificationResponse verifyCerts(Pkcs12InfoRequest request) {

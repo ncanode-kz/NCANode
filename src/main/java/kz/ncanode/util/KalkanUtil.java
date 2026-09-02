@@ -81,6 +81,44 @@ public class KalkanUtil {
         }
     }
 
+    /**
+     * JCA-имя (или OID) алгоритма хэширования по XML-URI из {@code ds:DigestMethod}.
+     * Нужно для вычисления {@code xades:CertDigest} в SigningCertificateV2.
+     *
+     * @param xmlDigestUri URI алгоритма хэширования
+     * @return имя алгоритма для {@link java.security.MessageDigest#getInstance(String, String)}
+     */
+    public static String getDigestJcaNameByXmlUri(String xmlDigestUri) {
+        return switch (xmlDigestUri) {
+            case "urn:ietf:params:xml:ns:pkigovkz:xmlsec:algorithms:gostr34112015-512" -> "1.2.398.3.10.1.3.3";
+            case "urn:ietf:params:xml:ns:pkigovkz:xmlsec:algorithms:gostr34112015-256" -> "1.2.398.3.10.1.3.2";
+            case "http://www.w3.org/2001/04/xmlenc#sha256" -> "SHA-256";
+            case "http://www.w3.org/2001/04/xmldsig-more#sha1" -> "SHA-1";
+            default -> "GOST34311";
+        };
+    }
+
+    /**
+     * OID алгоритма хэширования для message imprint метки времени XAdES-T,
+     * подобранный под алгоритм ключа подписанта.
+     *
+     * @param certSignAlgOid OID алгоритма подписи сертификата
+     * @return OID/имя алгоритма хэширования для {@link kz.ncanode.service.TspService#create}
+     */
+    public static String getXadesTspImprintDigest(String certSignAlgOid) {
+        if (certSignAlgOid.equals(GOST3410_512_2015)) {
+            return "1.2.398.3.10.1.3.3";
+        } else if (certSignAlgOid.equals(GOST3410_256_2015)) {
+            return "1.2.398.3.10.1.3.2";
+        } else if (certSignAlgOid.equals(PKCSObjectIdentifiers.sha256WithRSAEncryption.getId())) {
+            return TSPAlgorithms.SHA256;
+        } else if (certSignAlgOid.equals(PKCSObjectIdentifiers.sha1WithRSAEncryption.getId())) {
+            return TSPAlgorithms.SHA1;
+        } else {
+            return TSPAlgorithms.GOST34311;
+        }
+    }
+
     public static String getHashingAlgorithmByOID(String oid) {
         HashMap<String, String> algos = new HashMap<>();
 

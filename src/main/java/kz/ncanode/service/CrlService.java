@@ -117,6 +117,35 @@ public class CrlService {
     }
 
     /**
+     * Возвращает DER-кодированные CRL из кэша (full + delta), покрывающие переданный сертификат
+     * (издатель CRL совпадает с издателем сертификата). Для вшивания в XAdES-LT.
+     *
+     * @param certificate сертификат, для которого нужны CRL
+     * @return список DER-кодированных CRL (может быть пустым)
+     */
+    public List<byte[]> getEncodedCrlsFor(X509Certificate certificate) {
+        final List<byte[]> result = new ArrayList<>();
+
+        for (final String cacheDirectory : List.of(CRL_CACHE_FULL_DIR_NAME, CRL_CACHE_DELTA_DIR_NAME)) {
+            for (final File crlFile : getCrlFiles(cacheDirectory)) {
+                final X509CRL crl = loadCrl(crlFile);
+
+                if (!crl.getIssuerX500Principal().equals(certificate.getIssuerX500Principal())) {
+                    continue;
+                }
+
+                try {
+                    result.add(crl.getEncoded());
+                } catch (CRLException e) {
+                    log.warn("Cannot encode CRL file {}: {}", crlFile.getName(), e.getMessage());
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /**
      * Обновляет кэш CRL
      *
      * @param force Если true, то кэш будет обновлен в любом случае
