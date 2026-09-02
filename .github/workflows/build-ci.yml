@@ -36,6 +36,8 @@ jobs:
           wget -P ./lib "$KALKAN_CRYPT_XMLDSIG_URL"
       - name: Build and Run tests
         run: ./gradlew build
+      - name: Verify committed openapi.yml is current
+        run: git diff --exit-code openapi.yml
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:

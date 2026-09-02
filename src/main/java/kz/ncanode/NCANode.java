@@ -10,8 +10,12 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.context.annotation.Configuration;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.servers.Server;
+import io.swagger.v3.oas.models.tags.Tag;
+import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
+
+import java.util.Comparator;
 
 
 @SpringBootApplication
@@ -48,6 +52,17 @@ public class NCANode extends SpringBootServletInitializer {
             String fullUrl = swaggerRelativePath;
             return new OpenAPI()
                 .addServersItem(new Server().url(fullUrl).description("current server"));
+        }
+
+        // Порядок тегов у springdoc = порядок сканирования контроллеров (зависит от ФС/платформы).
+        // Сортируем, чтобы экспортируемый openapi.yml был детерминированным (см. OpenApiExportTest).
+        @Bean
+        public OpenApiCustomizer sortTagsAlphabetically() {
+            return openApi -> {
+                if (openApi.getTags() != null) {
+                    openApi.getTags().sort(Comparator.comparing(Tag::getName));
+                }
+            };
         }
     }
 

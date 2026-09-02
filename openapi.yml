@@ -1,0 +1,1215 @@
+components:
+  schemas:
+    CertificateInfo:
+      properties:
+        issuer:
+          $ref: "#/components/schemas/CertificateSubject"
+        keyUsage:
+          enum:
+          - "UNKNOWN"
+          - "AUTH"
+          - "SIGN"
+          type: "string"
+        keyUser:
+          items:
+            enum:
+            - "INDIVIDUAL"
+            - "ORGANIZATION"
+            - "CEO"
+            - "CAN_SIGN"
+            - "CAN_SIGN_FINANCIAL"
+            - "HR"
+            - "EMPLOYEE"
+            - "NCA_PRIVILEGES"
+            - "NCA_ADMIN"
+            - "NCA_MANAGER"
+            - "NCA_OPERATOR"
+            - "IDENTIFICATION"
+            - "IDENTIFICATION_CON"
+            - "IDENTIFICATION_REMOTE"
+            - "IDENTIFICATION_REMOTE_DIGITAL_ID"
+            type: "string"
+          type: "array"
+          uniqueItems: true
+        notAfter:
+          format: "date-time"
+          type: "string"
+        notBefore:
+          format: "date-time"
+          type: "string"
+        publicKey:
+          type: "string"
+        revocations:
+          items:
+            $ref: "#/components/schemas/CertificateRevocationStatus"
+          type: "array"
+        serialNumber:
+          type: "string"
+        signAlg:
+          type: "string"
+        signature:
+          type: "string"
+        subject:
+          $ref: "#/components/schemas/CertificateSubject"
+        valid:
+          type: "boolean"
+      type: "object"
+    CertificateRevocationStatus:
+      properties:
+        by:
+          enum:
+          - "OCSP"
+          - "CRL"
+          type: "string"
+        reason:
+          type: "string"
+        revocationTime:
+          format: "date-time"
+          type: "string"
+        revoked:
+          type: "boolean"
+      type: "object"
+    CertificateSubject:
+      properties:
+        bin:
+          type: "string"
+        commonName:
+          type: "string"
+        country:
+          type: "string"
+        dn:
+          type: "string"
+        email:
+          type: "string"
+        gender:
+          enum:
+          - "NONE"
+          - "MALE"
+          - "FEMALE"
+          type: "string"
+        iin:
+          type: "string"
+        lastName:
+          type: "string"
+        locality:
+          type: "string"
+        organization:
+          type: "string"
+        state:
+          type: "string"
+        surName:
+          type: "string"
+      type: "object"
+    CmsCreateRequest:
+      properties:
+        cadesLevel:
+          enum:
+          - "B"
+          - "T"
+          - "LT"
+          - "LTA"
+          type: "string"
+        cms:
+          type: "string"
+        data:
+          type: "string"
+        detached:
+          type: "boolean"
+        signers:
+          items:
+            $ref: "#/components/schemas/SignerRequest"
+          minItems: 1
+          type: "array"
+        tsaPolicy:
+          enum:
+          - "TSA_GOST2015_POLICY"
+          - "TSA_GOST_POLICY"
+          - "TSA_GOSTGT_POLICY"
+          type: "string"
+        withTsp:
+          type: "boolean"
+      type: "object"
+    CmsDataResponse:
+      properties:
+        data:
+          type: "string"
+        message:
+          type: "string"
+        status:
+          format: "int32"
+          type: "integer"
+      type: "object"
+    CmsExtendRequest:
+      properties:
+        cadesLevel:
+          enum:
+          - "B"
+          - "T"
+          - "LT"
+          - "LTA"
+          type: "string"
+        cms:
+          minLength: 1
+          type: "string"
+        data:
+          type: "string"
+        tsaPolicy:
+          enum:
+          - "TSA_GOST2015_POLICY"
+          - "TSA_GOST_POLICY"
+          - "TSA_GOSTGT_POLICY"
+          type: "string"
+      required:
+      - "cadesLevel"
+      type: "object"
+    CmsResponse:
+      properties:
+        cms:
+          type: "string"
+        message:
+          type: "string"
+        status:
+          format: "int32"
+          type: "integer"
+      type: "object"
+    CmsSignerInfo:
+      properties:
+        adesLevel:
+          enum:
+          - "B"
+          - "T"
+          - "LT"
+          - "LTA"
+          type: "string"
+        bestSignatureTime:
+          format: "date-time"
+          type: "string"
+        certificates:
+          items:
+            $ref: "#/components/schemas/CertificateInfo"
+          type: "array"
+        message:
+          type: "string"
+        status:
+          enum:
+          - "VALID"
+          - "INVALID"
+          - "INDETERMINATE"
+          type: "string"
+        subIndication:
+          enum:
+          - "NO_SIGNING_CERTIFICATE_FOUND"
+          - "SIG_CRYPTO_FAILURE"
+          - "CERT_HASH_MISMATCH"
+          - "TIMESTAMP_INVALID"
+          - "OUT_OF_BOUNDS_NO_POE"
+          - "CHAIN_INCOMPLETE"
+          - "CERT_REVOKED"
+          - "REVOKED_NO_POE"
+          - "REVOCATION_DATA_MISSING"
+          - "FORMAT_FAILURE"
+          type: "string"
+        tsp:
+          $ref: "#/components/schemas/TspInfo"
+      type: "object"
+    CmsVerificationResponse:
+      properties:
+        message:
+          type: "string"
+        signers:
+          items:
+            $ref: "#/components/schemas/CmsSignerInfo"
+          type: "array"
+        status:
+          format: "int32"
+          type: "integer"
+        valid:
+          type: "boolean"
+      type: "object"
+    CmsVerifyRequest:
+      properties:
+        cms:
+          minLength: 1
+          type: "string"
+        data:
+          type: "string"
+        revocationCheck:
+          items:
+            enum:
+            - "OCSP"
+            - "CRL"
+            type: "string"
+          type: "array"
+          uniqueItems: true
+      type: "object"
+    JsonNode:
+      type: "object"
+    JwsSignRequest:
+      properties:
+        detached:
+          type: "boolean"
+        jws:
+          $ref: "#/components/schemas/JsonNode"
+        payload:
+          $ref: "#/components/schemas/JsonNode"
+        signers:
+          items:
+            $ref: "#/components/schemas/JwsSignerRequest"
+          minItems: 1
+          type: "array"
+        typ:
+          type: "string"
+      type: "object"
+    JwsSignResponse:
+      properties:
+        jws:
+          $ref: "#/components/schemas/JsonNode"
+        message:
+          type: "string"
+        status:
+          format: "int32"
+          type: "integer"
+      type: "object"
+    JwsSignerInfo:
+      properties:
+        certificate:
+          $ref: "#/components/schemas/CertificateInfo"
+        header:
+          additionalProperties:
+            type: "object"
+          type: "object"
+        valid:
+          type: "boolean"
+      type: "object"
+    JwsSignerRequest:
+      properties:
+        alg:
+          minLength: 1
+          type: "string"
+        key:
+          minLength: 1
+          type: "string"
+        keyAlias:
+          type: "string"
+        password:
+          minLength: 1
+          type: "string"
+      type: "object"
+    JwsVerifyRequest:
+      properties:
+        jws:
+          $ref: "#/components/schemas/JsonNode"
+        payload:
+          $ref: "#/components/schemas/JsonNode"
+        revocationCheck:
+          items:
+            enum:
+            - "OCSP"
+            - "CRL"
+            type: "string"
+          type: "array"
+          uniqueItems: true
+      required:
+      - "jws"
+      type: "object"
+    JwsVerifyResponse:
+      properties:
+        message:
+          type: "string"
+        payload:
+          $ref: "#/components/schemas/JsonNode"
+        signers:
+          items:
+            $ref: "#/components/schemas/JwsSignerInfo"
+          type: "array"
+        status:
+          format: "int32"
+          type: "integer"
+        valid:
+          type: "boolean"
+      type: "object"
+    Jwt:
+      properties:
+        header:
+          additionalProperties:
+            type: "string"
+          type: "object"
+        payload:
+          additionalProperties:
+            type: "object"
+          type: "object"
+      type: "object"
+    JwtDecodeRequest:
+      properties:
+        jwt:
+          type: "string"
+        key:
+          minLength: 1
+          type: "string"
+      required:
+      - "jwt"
+      type: "object"
+    JwtDecodeResponse:
+      properties:
+        jwt:
+          $ref: "#/components/schemas/Jwt"
+        message:
+          type: "string"
+        status:
+          format: "int32"
+          type: "integer"
+        valid:
+          type: "boolean"
+      type: "object"
+    JwtEncodeRequest:
+      properties:
+        jwt:
+          $ref: "#/components/schemas/JwtRequest"
+        key:
+          minLength: 1
+          type: "string"
+        keyAlias:
+          type: "string"
+        password:
+          minLength: 1
+          type: "string"
+      required:
+      - "jwt"
+      type: "object"
+    JwtEncodeResponse:
+      properties:
+        jwt:
+          type: "string"
+        message:
+          type: "string"
+        status:
+          format: "int32"
+          type: "integer"
+      type: "object"
+    JwtHeader:
+      properties:
+        alg:
+          minLength: 1
+          type: "string"
+        typ:
+          minLength: 1
+          type: "string"
+      type: "object"
+    JwtPayload:
+      properties:
+        claims:
+          additionalProperties:
+            type: "object"
+          type: "object"
+      type: "object"
+    JwtRequest:
+      properties:
+        header:
+          $ref: "#/components/schemas/JwtHeader"
+        payload:
+          $ref: "#/components/schemas/JwtPayload"
+      required:
+      - "header"
+      - "payload"
+      type: "object"
+    PdfExtendRequest:
+      properties:
+        padesLevel:
+          enum:
+          - "B"
+          - "T"
+          - "LT"
+          - "LTA"
+          type: "string"
+        pdf:
+          minLength: 1
+          type: "string"
+        tsaPolicy:
+          enum:
+          - "TSA_GOST2015_POLICY"
+          - "TSA_GOST_POLICY"
+          - "TSA_GOSTGT_POLICY"
+          type: "string"
+      required:
+      - "padesLevel"
+      type: "object"
+    PdfSignRequest:
+      properties:
+        padesLevel:
+          enum:
+          - "B"
+          - "T"
+          - "LT"
+          - "LTA"
+          type: "string"
+        pdf:
+          minLength: 1
+          type: "string"
+        signers:
+          items:
+            $ref: "#/components/schemas/PdfSigner"
+          minItems: 1
+          type: "array"
+        tsaPolicy:
+          enum:
+          - "TSA_GOST2015_POLICY"
+          - "TSA_GOST_POLICY"
+          - "TSA_GOSTGT_POLICY"
+          type: "string"
+        withTsp:
+          type: "boolean"
+      type: "object"
+    PdfSignResponse:
+      properties:
+        message:
+          type: "string"
+        pdf:
+          type: "string"
+        status:
+          format: "int32"
+          type: "integer"
+      type: "object"
+    PdfSigner:
+      properties:
+        contactInfo:
+          type: "string"
+        location:
+          type: "string"
+        reason:
+          type: "string"
+        signer:
+          $ref: "#/components/schemas/SignerRequest"
+      type: "object"
+    PdfSignerInfo:
+      properties:
+        adesLevel:
+          enum:
+          - "B"
+          - "T"
+          - "LT"
+          - "LTA"
+          type: "string"
+        bestSignatureTime:
+          format: "date-time"
+          type: "string"
+        certificate:
+          $ref: "#/components/schemas/CertificateInfo"
+        contactInfo:
+          type: "string"
+        digestAlgorithm:
+          type: "string"
+        location:
+          type: "string"
+        reason:
+          type: "string"
+        signDate:
+          format: "date-time"
+          type: "string"
+        signatureAlgorithm:
+          type: "string"
+        status:
+          enum:
+          - "VALID"
+          - "INVALID"
+          - "INDETERMINATE"
+          type: "string"
+        subIndication:
+          enum:
+          - "NO_SIGNING_CERTIFICATE_FOUND"
+          - "SIG_CRYPTO_FAILURE"
+          - "CERT_HASH_MISMATCH"
+          - "TIMESTAMP_INVALID"
+          - "OUT_OF_BOUNDS_NO_POE"
+          - "CHAIN_INCOMPLETE"
+          - "CERT_REVOKED"
+          - "REVOKED_NO_POE"
+          - "REVOCATION_DATA_MISSING"
+          - "FORMAT_FAILURE"
+          type: "string"
+        tsp:
+          $ref: "#/components/schemas/TspInfo"
+        valid:
+          type: "boolean"
+      type: "object"
+    PdfVerificationResponse:
+      properties:
+        message:
+          type: "string"
+        signers:
+          items:
+            $ref: "#/components/schemas/PdfSignerInfo"
+          type: "array"
+        status:
+          format: "int32"
+          type: "integer"
+        valid:
+          type: "boolean"
+      type: "object"
+    PdfVerifyRequest:
+      properties:
+        pdf:
+          minLength: 1
+          type: "string"
+        revocationCheck:
+          items:
+            enum:
+            - "OCSP"
+            - "CRL"
+            type: "string"
+          type: "array"
+          uniqueItems: true
+      type: "object"
+    Pkcs12AliasesResponse:
+      properties:
+        aliases:
+          items:
+            items:
+              type: "string"
+            type: "array"
+          type: "array"
+        message:
+          type: "string"
+        status:
+          format: "int32"
+          type: "integer"
+      type: "object"
+    Pkcs12InfoRequest:
+      properties:
+        keys:
+          items:
+            $ref: "#/components/schemas/SignerRequest"
+          minItems: 1
+          type: "array"
+        revocationCheck:
+          items:
+            enum:
+            - "OCSP"
+            - "CRL"
+            type: "string"
+          type: "array"
+          uniqueItems: true
+      type: "object"
+    SbaSignRequest:
+      properties:
+        data:
+          minLength: 1
+          type: "string"
+        signer:
+          $ref: "#/components/schemas/SignerRequest"
+        tsaPolicy:
+          enum:
+          - "TSA_GOST2015_POLICY"
+          - "TSA_GOST_POLICY"
+          - "TSA_GOSTGT_POLICY"
+          type: "string"
+      type: "object"
+    SbaSignResponse:
+      properties:
+        certificate:
+          type: "string"
+        message:
+          type: "string"
+        signature:
+          type: "string"
+        status:
+          format: "int32"
+          type: "integer"
+      type: "object"
+    SbaVerifyRequest:
+      properties:
+        certificate:
+          minLength: 1
+          type: "string"
+        data:
+          type: "string"
+        revocationCheck:
+          items:
+            enum:
+            - "OCSP"
+            - "CRL"
+            type: "string"
+          type: "array"
+          uniqueItems: true
+        signature:
+          type: "string"
+      type: "object"
+    SignerRequest:
+      properties:
+        key:
+          minLength: 1
+          type: "string"
+        keyAlias:
+          type: "string"
+        password:
+          minLength: 1
+          type: "string"
+        referenceUri:
+          type: "string"
+      type: "object"
+    TspInfo:
+      properties:
+        genTime:
+          format: "date-time"
+          type: "string"
+        hash:
+          type: "string"
+        policy:
+          type: "string"
+        serialNumber:
+          type: "string"
+        tsa:
+          type: "string"
+        tspHashAlgorithm:
+          type: "string"
+      type: "object"
+    VerificationResponse:
+      properties:
+        adesLevel:
+          enum:
+          - "B"
+          - "T"
+          - "LT"
+          - "LTA"
+          type: "string"
+        adesStatus:
+          enum:
+          - "VALID"
+          - "INVALID"
+          - "INDETERMINATE"
+          type: "string"
+        adesSubIndication:
+          enum:
+          - "NO_SIGNING_CERTIFICATE_FOUND"
+          - "SIG_CRYPTO_FAILURE"
+          - "CERT_HASH_MISMATCH"
+          - "TIMESTAMP_INVALID"
+          - "OUT_OF_BOUNDS_NO_POE"
+          - "CHAIN_INCOMPLETE"
+          - "CERT_REVOKED"
+          - "REVOKED_NO_POE"
+          - "REVOCATION_DATA_MISSING"
+          - "FORMAT_FAILURE"
+          type: "string"
+        bestSignatureTime:
+          format: "date-time"
+          type: "string"
+        message:
+          type: "string"
+        signatureTimestamp:
+          $ref: "#/components/schemas/TspInfo"
+        signers:
+          items:
+            $ref: "#/components/schemas/CertificateInfo"
+          type: "array"
+        status:
+          format: "int32"
+          type: "integer"
+        valid:
+          type: "boolean"
+      type: "object"
+    WsseSignRequest:
+      properties:
+        key:
+          minLength: 1
+          type: "string"
+        keyAlias:
+          type: "string"
+        password:
+          minLength: 1
+          type: "string"
+        trimXml:
+          type: "boolean"
+        xml:
+          minLength: 1
+          type: "string"
+      type: "object"
+    X509InfoRequest:
+      properties:
+        certs:
+          items:
+            type: "string"
+          type: "array"
+        revocationCheck:
+          items:
+            enum:
+            - "OCSP"
+            - "CRL"
+            type: "string"
+          type: "array"
+          uniqueItems: true
+      required:
+      - "certs"
+      type: "object"
+    XmlSignRequest:
+      properties:
+        clearSignatures:
+          type: "boolean"
+        signers:
+          items:
+            $ref: "#/components/schemas/SignerRequest"
+          minItems: 1
+          type: "array"
+        trimXml:
+          type: "boolean"
+        tsaPolicy:
+          enum:
+          - "TSA_GOST2015_POLICY"
+          - "TSA_GOST_POLICY"
+          - "TSA_GOSTGT_POLICY"
+          type: "string"
+        xadesLevel:
+          enum:
+          - "B"
+          - "T"
+          - "LT"
+          - "LTA"
+          type: "string"
+        xml:
+          minLength: 1
+          type: "string"
+      type: "object"
+    XmlSignResponse:
+      properties:
+        message:
+          type: "string"
+        status:
+          format: "int32"
+          type: "integer"
+        xml:
+          type: "string"
+      type: "object"
+    XmlVerifyRequest:
+      properties:
+        revocationCheck:
+          items:
+            enum:
+            - "OCSP"
+            - "CRL"
+            type: "string"
+          type: "array"
+          uniqueItems: true
+        xml:
+          minLength: 1
+          type: "string"
+      type: "object"
+info:
+  title: "OpenAPI definition"
+  version: "v0"
+openapi: "3.1.0"
+paths:
+  /cms/extend:
+    post:
+      operationId: "extend_1"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CmsExtendRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CmsResponse"
+          description: "OK"
+      tags:
+      - "CMS"
+  /cms/extract:
+    post:
+      operationId: "extract"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CmsVerifyRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CmsDataResponse"
+          description: "OK"
+      tags:
+      - "CMS"
+  /cms/sign:
+    post:
+      operationId: "sign_5"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CmsCreateRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CmsResponse"
+          description: "OK"
+      tags:
+      - "CMS"
+  /cms/sign/add:
+    post:
+      operationId: "signAdd_1"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CmsCreateRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CmsResponse"
+          description: "OK"
+      tags:
+      - "CMS"
+  /cms/verify:
+    post:
+      operationId: "verify_6"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CmsVerifyRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CmsVerificationResponse"
+          description: "OK"
+      tags:
+      - "CMS"
+  /jws/sign:
+    post:
+      operationId: "sign_4"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JwsSignRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/JwsSignResponse"
+          description: "OK"
+      tags:
+      - "JWS"
+  /jws/sign/add:
+    post:
+      operationId: "signAdd"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JwsSignRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/JwsSignResponse"
+          description: "OK"
+      tags:
+      - "JWS"
+  /jws/verify:
+    post:
+      operationId: "verify_5"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JwsVerifyRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/JwsVerifyResponse"
+          description: "OK"
+      tags:
+      - "JWS"
+  /jwt/decode:
+    post:
+      operationId: "decode"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JwtDecodeRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/JwtDecodeResponse"
+          description: "OK"
+      tags:
+      - "JWT"
+  /jwt/encode:
+    post:
+      operationId: "encode"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JwtEncodeRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/JwtEncodeResponse"
+          description: "OK"
+      tags:
+      - "JWT"
+  /pdf/extend:
+    post:
+      operationId: "extend"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PdfExtendRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PdfSignResponse"
+          description: "OK"
+      tags:
+      - "PDF"
+  /pdf/sign:
+    post:
+      operationId: "sign_3"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PdfSignRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PdfSignResponse"
+          description: "OK"
+      tags:
+      - "PDF"
+  /pdf/verify:
+    post:
+      operationId: "verify_4"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PdfVerifyRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/PdfVerificationResponse"
+          description: "OK"
+      tags:
+      - "PDF"
+  /pkcs12/aliases:
+    post:
+      operationId: "aliases"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Pkcs12InfoRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/Pkcs12AliasesResponse"
+          description: "OK"
+      tags:
+      - "Pkcs12"
+  /pkcs12/info:
+    post:
+      operationId: "info"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Pkcs12InfoRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/VerificationResponse"
+          description: "OK"
+      tags:
+      - "Pkcs12"
+  /wsse/sign:
+    post:
+      operationId: "sign_2"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WsseSignRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/XmlSignResponse"
+          description: "OK"
+      tags:
+      - "WSSE"
+  /wsse/verify:
+    post:
+      operationId: "verify_3"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/XmlVerifyRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/VerificationResponse"
+          description: "OK"
+      tags:
+      - "WSSE"
+  /x509/info:
+    post:
+      operationId: "verify_2"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/X509InfoRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/VerificationResponse"
+          description: "OK"
+      tags:
+      - "X509"
+  /x509/sign:
+    post:
+      operationId: "sign_1"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SbaSignRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SbaSignResponse"
+          description: "OK"
+      tags:
+      - "X509"
+  /x509/verify:
+    post:
+      operationId: "verify_1"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SbaVerifyRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/VerificationResponse"
+          description: "OK"
+      tags:
+      - "X509"
+  /xml/sign:
+    post:
+      operationId: "sign"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/XmlSignRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/XmlSignResponse"
+          description: "OK"
+      tags:
+      - "XML"
+  /xml/verify:
+    post:
+      operationId: "verify"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/XmlVerifyRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/VerificationResponse"
+          description: "OK"
+      tags:
+      - "XML"
+servers:
+- description: "current server"
+  url: ""
+tags:
+- description: "Методы для работы с CMS"
+  name: "CMS"
+- description: "Подпись и проверка произвольного JSON в формате JWS"
+  name: "JWS"
+- description: "Методы для работы с JWT"
+  name: "JWT"
+- description: "Методы для работы с PDF"
+  name: "PDF"
+- description: "Методы для работы с Pkcs12"
+  name: "Pkcs12"
+- description: "Методы для работы с WSSE"
+  name: "WSSE"
+- description: "Методы для работы с x509"
+  name: "X509"
+- description: "Методы для работы с XML"
+  name: "XML"
