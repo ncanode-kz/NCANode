@@ -11,6 +11,7 @@ import kz.ncanode.dto.response.VerificationResponse;
 import kz.ncanode.dto.ades.AdesValidationData;
 import kz.ncanode.exception.ClientException;
 import kz.ncanode.exception.ServerException;
+import kz.ncanode.exception.ServerOp;
 import kz.ncanode.wrapper.CertificateWrapper;
 import kz.ncanode.wrapper.KalkanWrapper;
 import lombok.RequiredArgsConstructor;
@@ -262,7 +263,7 @@ public class CertificateService {
     }
 
     public SbaSignResponse create(SbaSignRequest sbaSignRequest) {
-        try {
+        return ServerOp.call(null, () -> {
             String keyBase64 = sbaSignRequest.getSigner().getKey();
             //System.out.println("keyBase64: " + keyBase64);
 
@@ -310,8 +311,6 @@ public class CertificateService {
                 .certificate(Base64.getEncoder().encodeToString(certificate.getEncoded()))
                 .signature(Base64.getEncoder().encodeToString(signBytes))
                 .build();
-        } catch (Exception e) {
-            throw new ServerException(e.getMessage(), e);
-        }
+        });
     }
 }

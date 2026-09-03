@@ -3,9 +3,7 @@ package kz.ncanode.service;
 import kz.ncanode.dto.request.WsseSignRequest;
 import kz.ncanode.dto.response.VerificationResponse;
 import kz.ncanode.dto.response.XmlSignResponse;
-import kz.ncanode.exception.ClientException;
-import kz.ncanode.exception.KeyException;
-import kz.ncanode.exception.ServerException;
+import kz.ncanode.exception.ServerOp;
 import kz.ncanode.wrapper.CertificateWrapper;
 import kz.ncanode.wrapper.KalkanWrapper;
 import kz.ncanode.wrapper.KeyStoreWrapper;
@@ -59,7 +57,7 @@ public class WsseService {
      * @return Подписанный SOAP-конверт
      */
     public XmlSignResponse sign(final WsseSignRequest wsseSignRequest) {
-        try {
+        return ServerOp.call(null, () -> {
             // read key
             final KeyStoreWrapper keystore = kalkanWrapper.read(wsseSignRequest.getKey(), wsseSignRequest.getKeyAlias(), wsseSignRequest.getPassword());
             final CertificateWrapper cert = keystore.getCertificate();
@@ -112,11 +110,7 @@ public class WsseService {
                     .xml(os.toString())
                     .build();
             }
-        } catch (KeyException e) {
-            throw new ClientException(e.getMessage(), e);
-        } catch (Exception e) {
-            throw new ServerException(e.getMessage(), e);
-        }
+        });
     }
 
     /**
@@ -128,7 +122,7 @@ public class WsseService {
      * @return Результат проверки
      */
     public VerificationResponse verify(String xml, boolean checkOcsp, boolean checkCrl) {
-        try {
+        return ServerOp.call(null, () -> {
             SOAPMessage msg = MessageFactory.newInstance().createMessage(null, new ByteArrayInputStream(
                 xmlService.prepare(xml, false).getBytes(StandardCharsets.UTF_8)
             ));
@@ -167,8 +161,6 @@ public class WsseService {
                 .valid(valid)
                 .signers(certs.stream().map(c -> c.toCertificateInfo(currentDate, checkOcsp, checkCrl)).toList())
                 .build();
-        } catch (Exception e) {
-            throw new ServerException(e.getMessage(), e);
-        }
+        });
     }
 }

@@ -13,8 +13,7 @@ import kz.ncanode.dto.request.JwtEncodeRequest;
 import kz.ncanode.dto.response.JwtDecodeResponse;
 import kz.ncanode.dto.response.JwtEncodeResponse;
 import kz.ncanode.exception.ClientException;
-import kz.ncanode.exception.KeyException;
-import kz.ncanode.exception.ServerException;
+import kz.ncanode.exception.ServerOp;
 import kz.ncanode.util.JwtAlgorithmUtil;
 import kz.ncanode.wrapper.CertificateWrapper;
 import kz.ncanode.wrapper.KalkanWrapper;
@@ -47,7 +46,7 @@ public class JwtService {
      * @return Ответ с подписанным JWT
      */
     public JwtEncodeResponse encode(JwtEncodeRequest jwtEncodeRequest) {
-        try {
+        return ServerOp.call(null, () -> {
             final KeyStoreWrapper keystore = kalkanWrapper.read(jwtEncodeRequest.getKey(), jwtEncodeRequest.getKeyAlias(), jwtEncodeRequest.getPassword());
             final CertificateWrapper cert = keystore.getCertificate();
 
@@ -70,12 +69,7 @@ public class JwtService {
             return JwtEncodeResponse.builder()
                 .jwt(jwt)
                 .build();
-
-        } catch (KeyException e) {
-            throw new ClientException(e.getMessage(), e);
-        } catch (Exception e) {
-            throw new ServerException(e.getMessage(), e);
-        }
+        });
     }
 
     /**
@@ -85,7 +79,7 @@ public class JwtService {
      * @return Результат проверки с декодированными данными
      */
     public JwtDecodeResponse decode(JwtDecodeRequest jwtDecodeRequest) {
-        try {
+        return ServerOp.callClient(null, () -> {
 
             var x509 = CertificateService.load(Base64.getDecoder().decode(jwtDecodeRequest.getKey().replaceAll("\\s", "")));
 
@@ -130,12 +124,7 @@ public class JwtService {
                     .payload(payload)
                     .build())
                 .build();
-
-        } catch (ClientException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new ClientException(e.getMessage(), e);
-        }
+        });
     }
 
     @SuppressWarnings("unchecked")

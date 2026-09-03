@@ -25,6 +25,7 @@ import kz.ncanode.dto.tsp.TsaPolicy;
 import kz.ncanode.dto.tsp.TspInfo;
 import kz.ncanode.exception.ClientException;
 import kz.ncanode.exception.ServerException;
+import kz.ncanode.exception.ServerOp;
 import kz.ncanode.util.KalkanUtil;
 import kz.ncanode.util.Util;
 import kz.ncanode.wrapper.CadesSignatureWrapper;
@@ -66,7 +67,7 @@ public class CmsService {
      * @return
      */
     public CmsResponse create(CmsCreateRequest cmsCreateRequest) {
-        try {
+        return ServerOp.call(null, () -> {
             CMSSignedDataGenerator generator = new CMSSignedDataGenerator();
             val data = Base64.getDecoder().decode(cmsCreateRequest.getData());
 
@@ -119,11 +120,7 @@ public class CmsService {
             return CmsResponse.builder()
                 .cms(Base64.getEncoder().encodeToString(signed.getEncoded()))
                 .build();
-        } catch (ClientException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new ServerException(e.getMessage(), e);
-        }
+        });
     }
 
     /**
@@ -133,7 +130,7 @@ public class CmsService {
      * @return
      */
     public CmsResponse addSigners(CmsCreateRequest cmsCreateRequest) {
-        try {
+        return ServerOp.call(null, () -> {
             if (cmsCreateRequest.getCms() == null || cmsCreateRequest.getCms().isEmpty()) {
                 throw new ClientException("CMS argument not specified");
             }
@@ -212,11 +209,7 @@ public class CmsService {
             return CmsResponse.builder()
                 .cms(Base64.getEncoder().encodeToString(signed.getEncoded()))
                 .build();
-        } catch (ClientException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new ServerException(e.getMessage(), e);
-        }
+        });
     }
 
     private static boolean isSignerSameAsPrevious(SignerInformation signer, CMSSignedData cms) {
@@ -240,7 +233,7 @@ public class CmsService {
      * @return
      */
     public CmsVerificationResponse verify(String signedCms, String detachedData, boolean checkOcsp, boolean checkCrl) {
-        try {
+        return ServerOp.callClient(null, () -> {
             CMSSignedData cms = new CMSSignedData(Base64.getDecoder().decode(signedCms.getBytes(StandardCharsets.UTF_8)));
 
             if (detachedData != null && cms.getSignedContent() == null) {
@@ -315,9 +308,7 @@ public class CmsService {
                 .valid(valid)
                 .signers(signers)
                 .build();
-        } catch (Exception e) {
-            throw new ClientException(e.getMessage(), e);
-        }
+        });
     }
 
     /**
@@ -327,7 +318,7 @@ public class CmsService {
      * @return
      */
     public CmsDataResponse extract(String signedCms) {
-        try {
+        return ServerOp.call(null, () -> {
             val cms = new CMSSignedData(Base64.getDecoder().decode(signedCms));
 
             if (cms.getSignedContent() == null) {
@@ -340,9 +331,7 @@ public class CmsService {
                     .data(Base64.getEncoder().encodeToString(out.toByteArray()))
                     .build();
             }
-        } catch (CMSException|IOException e) {
-            throw new ServerException(e.getMessage(), e);
-        }
+        });
     }
 
     private List<X509Certificate> getCertificatesFromCmsSignedData(CMSSignedData cms) throws
@@ -369,9 +358,8 @@ public class CmsService {
         return certs;
     }
 
-    private void addSignersToCmsGenerator(CMSSignedDataGenerator generator, byte[] decodedData, List<X509Certificate> certificates, List<SignerRequest> signers, boolean cades) {
-        try {
-            for (KeyStoreWrapper ks : kalkanWrapper.read(signers)) {
+    private void addSignersToCmsGenerator(CMSSignedDataGenerator generator, byte[] decodedData, List<X509Certificate> certificates, List<SignerRequest> signers, boolean cades) throws Exception {
+        for (KeyStoreWrapper ks : kalkanWrapper.read(signers)) {
                 CertificateWrapper cert = ks.getCertificate();
                 val privateKey = ks.getPrivateKey();
 
@@ -389,11 +377,6 @@ public class CmsService {
                 }
 
                 certificates.add(cert.getX509Certificate());
-            }
-        } catch (ClientException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new ServerException(e.getMessage(), e);
         }
     }
 
@@ -438,7 +421,7 @@ public class CmsService {
      * Уже присутствующие элементы (метка времени, вшитый отзыв) не дублируются.
      */
     public CmsResponse extend(CmsExtendRequest request) {
-        try {
+        return ServerOp.call(null, () -> {
             byte[] decodedCms = Base64.getDecoder().decode(request.getCms());
             CMSSignedData cms = new CMSSignedData(decodedCms);
 
@@ -462,11 +445,7 @@ public class CmsService {
             return CmsResponse.builder()
                 .cms(Base64.getEncoder().encodeToString(extended.getEncoded()))
                 .build();
-        } catch (ClientException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new ServerException(e.getMessage(), e);
-        }
+        });
     }
 
     private CMSSignedData applyCadesLevel(CMSSignedData signed, List<X509Certificate> signerCerts,

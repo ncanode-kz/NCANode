@@ -17,8 +17,7 @@ import kz.ncanode.dto.request.JwsVerifyRequest;
 import kz.ncanode.dto.response.JwsSignResponse;
 import kz.ncanode.dto.response.JwsVerifyResponse;
 import kz.ncanode.exception.ClientException;
-import kz.ncanode.exception.KeyException;
-import kz.ncanode.exception.ServerException;
+import kz.ncanode.exception.ServerOp;
 import kz.ncanode.util.JwtAlgorithmUtil;
 import kz.ncanode.wrapper.CertificateWrapper;
 import kz.ncanode.wrapper.KalkanWrapper;
@@ -61,7 +60,7 @@ public class JwsService {
      * Создаёт новый JWS.
      */
     public JwsSignResponse sign(JwsSignRequest request) {
-        try {
+        return ServerOp.call(null, () -> {
             if (request.getPayload() == null) {
                 throw new ClientException("payload argument not specified");
             }
@@ -80,20 +79,14 @@ public class JwsService {
             jws.set("signatures", signatures);
 
             return JwsSignResponse.builder().jws(jws).build();
-        } catch (KeyException e) {
-            throw new ClientException(e.getMessage(), e);
-        } catch (ClientException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new ServerException(e.getMessage(), e);
-        }
+        });
     }
 
     /**
      * Добавляет подписантов в существующий JWS.
      */
     public JwsSignResponse addSigners(JwsSignRequest request) {
-        try {
+        return ServerOp.call(null, () -> {
             JsonNode existing = request.getJws();
             if (existing == null || !existing.isObject()) {
                 throw new ClientException("jws argument not specified");
@@ -131,20 +124,14 @@ public class JwsService {
             jws.set("signatures", signatures);
 
             return JwsSignResponse.builder().jws(jws).build();
-        } catch (KeyException e) {
-            throw new ClientException(e.getMessage(), e);
-        } catch (ClientException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new ServerException(e.getMessage(), e);
-        }
+        });
     }
 
     /**
      * Проверяет JWS.
      */
     public JwsVerifyResponse verify(JwsVerifyRequest request) {
-        try {
+        return ServerOp.callClient(null, () -> {
             JsonNode jws = request.getJws();
             if (jws == null || !jws.isObject()) {
                 throw new ClientException("jws argument not specified");
@@ -224,11 +211,7 @@ public class JwsService {
                 .signers(signers)
                 .payload(payloadOut)
                 .build();
-        } catch (ClientException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new ClientException(e.getMessage(), e);
-        }
+        });
     }
 
     /**

@@ -12,8 +12,8 @@ import kz.ncanode.dto.response.PdfSignResponse;
 import kz.ncanode.dto.response.PdfVerificationResponse;
 import kz.ncanode.dto.tsp.TsaPolicy;
 import kz.ncanode.exception.ClientException;
-import kz.ncanode.exception.ServerException;
 import kz.ncanode.exception.NoSignaturesFoundException;
+import kz.ncanode.exception.ServerOp;
 import kz.ncanode.util.KalkanUtil;
 import kz.ncanode.wrapper.CertificateWrapper;
 import kz.ncanode.wrapper.KeyStoreWrapper;
@@ -57,7 +57,7 @@ public class PdfService {
 	 * @return Signed PDF response
 	 */
 	public PdfSignResponse sign(PdfSignRequest pdfSignRequest) {
-		try {
+		return ServerOp.call("Error signing PDF", () -> {
 			byte[] pdfBytes = Base64.getDecoder().decode(pdfSignRequest.getPdf());
 
 			final AdesLevel level = pdfSignRequest.getPadesLevel();
@@ -103,13 +103,7 @@ public class PdfService {
 			return PdfSignResponse.builder()
 					.pdf(Base64.getEncoder().encodeToString(pdfBytes))
 					.build();
-
-		} catch (ClientException e) {
-			throw e;
-		} catch (Exception e) {
-			log.error("Error signing PDF", e);
-			throw new ServerException("Error signing PDF: " + e.getMessage(), e);
-		}
+		});
 	}
 
 	private static String tsaPolicyId(TsaPolicy policy) {
@@ -121,7 +115,7 @@ public class PdfService {
 	 * Достраивает подписанный PDF до PAdES-LT / LTA.
 	 */
 	public PdfSignResponse extend(kz.ncanode.dto.request.PdfExtendRequest request) {
-		try {
+		return ServerOp.call("Error extending PDF", () -> {
 			if (!request.getPadesLevel().isAtLeast(AdesLevel.LT)) {
 				throw new ClientException("PAdES extension supports only LT and LTA; sign at B or T level");
 			}
@@ -139,17 +133,13 @@ public class PdfService {
 			return PdfSignResponse.builder()
 					.pdf(Base64.getEncoder().encodeToString(pdfBytes))
 					.build();
-		} catch (ClientException e) {
-			throw e;
-		} catch (Exception e) {
-			throw new ServerException("Error extending PDF: " + e.getMessage(), e);
-		}
+		});
 	}
 
 	/**
 	 * PAdES-LT: собирает по каждой подписи PDF цепочку и данные отзыва и пишет {@code /DSS} + {@code /VRI}.
 	 */
-	private byte[] addDocumentSecurityStore(byte[] pdfBytes) throws IOException {
+	private byte[] addDocumentSecurityStore(byte[] pdfBytes) throws Exception {
 		try (PDDocument document = PDDocument.load(new ByteArrayInputStream(pdfBytes))) {
 			PadesLtvBuilder ltv = new PadesLtvBuilder(document);
 
@@ -183,17 +173,13 @@ public class PdfService {
 			ByteArrayOutputStream out = new ByteArrayOutputStream();
 			document.saveIncremental(out);
 			return out.toByteArray();
-		} catch (ClientException e) {
-			throw e;
-		} catch (Exception e) {
-			throw new ServerException("Cannot add /DSS document security store: " + e.getMessage(), e);
 		}
 	}
 
 	/**
 	 * PAdES-LTA: добавляет ревизию с подписью {@code /DocTimeStamp} ({@code /SubFilter /ETSI.RFC3161}).
 	 */
-	private byte[] addDocumentTimestamp(byte[] pdfBytes, String tsaPolicyId) throws IOException {
+	private byte[] addDocumentTimestamp(byte[] pdfBytes, String tsaPolicyId) throws Exception {
 		try (PDDocument document = PDDocument.load(new ByteArrayInputStream(pdfBytes))) {
 			PDSignature timestamp = new PDSignature();
 			timestamp.setType(COSName.getPDFName("DocTimeStamp"));
@@ -218,8 +204,6 @@ public class PdfService {
 			document.saveIncremental(out);
 			options.close();
 			return out.toByteArray();
-		} catch (Exception e) {
-			throw new ServerException("Cannot add document timestamp: " + e.getMessage(), e);
 		}
 	}
 
@@ -256,7 +240,7 @@ public class PdfService {
 	 * @return PDF verification response
 	 */
 	public PdfVerificationResponse verify(PdfVerifyRequest pdfVerifyRequest) {
-		try {
+		return ServerOp.call("Error verifying PDF", () -> {
 			byte[] pdfBytes = Base64.getDecoder().decode(pdfVerifyRequest.getPdf());
 
 			// Load PDF document
@@ -300,12 +284,7 @@ public class PdfService {
 					.valid(allValid)
 					.signers(signerInfos)
 					.build();
-
-		} catch (NoSignaturesFoundException e) {
-			throw e;
-		} catch (Exception e) {
-			throw new ServerException("Error verifying PDF: " + e.getMessage(), e);
-		}
+		});
 	}
 
 	/**
