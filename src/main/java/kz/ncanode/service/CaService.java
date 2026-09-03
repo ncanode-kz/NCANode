@@ -157,6 +157,21 @@ public class CaService {
         return chain;
     }
 
+    /**
+     * Прогрет ли кэш УЦ: сертификаты скачаны и читаются (или фича выключена).
+     */
+    public boolean isCacheReady() {
+        if (!caConfiguration.isEnabled()) {
+            return true;
+        }
+
+        try {
+            return !getRootCertificates().isEmpty();
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
     public List<CertificateWrapper> getRootCertificates() {
         synchronized (directoryService) {
             synchronized (certificates) {

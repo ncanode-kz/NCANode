@@ -37,6 +37,11 @@ ncanode:
   tsp:
     url: ${NCANODE_TSP_URL:http://tsp.pki.gov.kz/}
     retries: ${NCANODE_TSP_RETRIES:3}
+management:
+  endpoint:
+    health:
+      show-components: always
+      show-details: always
 springdoc:
   show-actuator: true
   swagger-ui:

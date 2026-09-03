@@ -148,6 +148,40 @@ class CaServiceExtraTest extends Specification implements WithTestData {
         caService.getRootCertificateFor(root).isEmpty()
     }
 
+    def "isCacheReady is true when the CA feature is disabled"() {
+        given:
+        def service = standalone()
+        caConfiguration.isEnabled() >> false
+
+        expect:
+        service.isCacheReady()
+    }
+
+    def "isCacheReady is false when root certificates cannot be loaded"() {
+        given:
+        def service = standalone()
+        caConfiguration.isEnabled() >> true
+        directoryService.getCachePathFor('ca') >> Optional.empty()
+
+        expect:
+        !service.isCacheReady()
+    }
+
+    def "isCacheReady is true once a CA certificate is cached"() {
+        given:
+        def service = standalone()
+        def dir = File.createTempDir()
+        new File(dir, 'root.cer').bytes = rootBytes()
+        caConfiguration.isEnabled() >> true
+        directoryService.getCachePathFor('ca') >> Optional.of(dir)
+
+        expect:
+        service.isCacheReady()
+
+        cleanup:
+        dir.deleteDir()
+    }
+
     def "updateCache(false) is a no-op when the CA feature is disabled"() {
         given:
         def service = standalone()

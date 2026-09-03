@@ -52,6 +52,30 @@ class CrlServiceExtraTest extends Specification implements WithTestData {
         ResourceUtils.getFile("classpath:crl/${name}").bytes
     }
 
+    def "isCacheReady is true when CRL scheduling is disabled"() {
+        given:
+        crlConfiguration.isEnabled() >> false
+
+        expect:
+        service.isCacheReady()
+    }
+
+    def "isCacheReady reflects presence of a full CRL file"() {
+        given:
+        crlConfiguration.isEnabled() >> true
+        crlConfiguration.getTtl() >> 10
+        directoryService.getCachePathFor('crl/full') >> Optional.of(cacheDir)
+
+        expect:
+        !service.isCacheReady()
+
+        when:
+        new File(cacheDir, 'x.crl').text = 'x'
+
+        then:
+        service.isCacheReady()
+    }
+
     def "verify returns ACTIVE immediately when CRL checking is disabled"() {
         given:
         crlConfiguration.isEnabled() >> false

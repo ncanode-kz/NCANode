@@ -78,6 +78,21 @@ public class CrlService {
     }
 
     /**
+     * Прогрет ли кэш CRL: хотя бы один full-CRL скачан (или фича/расписание выключены).
+     */
+    public boolean isCacheReady() {
+        if (!crlConfiguration.isEnabled() || crlConfiguration.getTtl() == null || crlConfiguration.getTtl() < 1) {
+            return true;
+        }
+
+        try {
+            return !getCrlFiles(CRL_CACHE_FULL_DIR_NAME).isEmpty();
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    /**
      * Проверка сертификата в CRL
      *
      * @param cert Сертификат
