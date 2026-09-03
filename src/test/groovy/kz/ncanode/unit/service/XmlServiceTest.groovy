@@ -283,6 +283,21 @@ KR8n3tylbHk=
         references.item(1).attributes.getNamedItem("URI").textContent == ('#' + REFERENCE_URI)
     }
 
+    def "sign by reference uri without DOCTYPE id declaration"() {
+        given: 'xml with a plain Id attribute, no DTD/schema'
+        def xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><document Id=\"${REFERENCE_URI}\"><name>NCANode test</name></document>".toString()
+        def request = XmlSignRequest.builder().xml(xml).signers([SIGNER_REQUEST_VALID_2015_WITH_REFERENCE()]).build()
+
+        when: 'sign'
+        def response = xmlService.sign(request)
+
+        then: 'reference resolved, no ReferenceNotInitializedException'
+        noExceptionThrown()
+        def signed = DOMBuilder.parse(new StringReader(response.xml))
+        signed.documentElement.getElementsByTagName('ds:Reference').item(0)
+            .attributes.getNamedItem('URI').textContent == ('#' + REFERENCE_URI)
+    }
+
     @Unroll("#caseName")
     def "check xml verifying"() {
         given:

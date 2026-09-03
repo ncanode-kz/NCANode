@@ -110,6 +110,7 @@ public class XmlService {
         final String imprintDigest = KalkanUtil.getXadesTspImprintDigest(
             certificate.getX509Certificate().getSigAlgOID());
 
+        document.registerIdAttribute(signer.getReferenceUri());
         final XadesSignatureWrapper xades = new XadesSignatureWrapper(document, certificate, signer.getReferenceUri());
         xades.sign(keyStore.getPrivateKey());
 

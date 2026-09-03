@@ -76,6 +76,7 @@ public class DocumentWrapper {
      * @return XML Signature Wrapper
      */
     public XMLSignatureWrapper createXmlSignature(CertificateWrapper certificateWrapper, String referenceUri) {
+        registerIdAttribute(referenceUri);
         final XMLSignatureWrapper sig = new XMLSignatureWrapper(getDocument(), certificateWrapper.getSignAlgorithmId());
         getDocument().getDocumentElement().appendChild(sig.getXmlSignature().getElement());
         Transforms transforms = new Transforms(getDocument());
@@ -91,6 +92,28 @@ public class DocumentWrapper {
         }
 
         return sig;
+    }
+
+    /**
+     * Помечает атрибут элемента, на который ссылается {@code referenceUri} (вида {@code #id}), как ID-атрибут.
+     * Без DTD/схемы XML-парсер не знает, что {@code Id}/{@code id}/{@code ID} — это ID, и xmlsec не может
+     * разрешить {@code <ds:Reference URI="#id">}.
+     */
+    public void registerIdAttribute(String referenceUri) {
+        if (referenceUri == null || !referenceUri.startsWith("#")) {
+            return;
+        }
+        final String id = referenceUri.substring(1);
+        final org.w3c.dom.NodeList nodes = getDocument().getElementsByTagName("*");
+        for (int i = 0; i < nodes.getLength(); i++) {
+            final Element el = (Element) nodes.item(i);
+            for (String attr : new String[]{"Id", "id", "ID"}) {
+                if (id.equals(el.getAttribute(attr))) {
+                    el.setIdAttribute(attr, true);
+                    return;
+                }
+            }
+        }
     }
 
     @Override
