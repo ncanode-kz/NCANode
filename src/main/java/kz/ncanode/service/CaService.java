@@ -4,6 +4,7 @@ import kz.ncanode.annotation.Generated;
 import kz.ncanode.configuration.CaConfiguration;
 import kz.ncanode.dto.crl.CrlResult;
 import kz.ncanode.exception.CaException;
+import kz.ncanode.util.Util;
 import kz.ncanode.wrapper.CertificateWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -207,9 +208,10 @@ public class CaService {
             }
 
             try(FileOutputStream out = new FileOutputStream(file)) {
-                entity.writeTo(out);
+                Util.copyEntityBounded(entity, out, Util.MAX_HTTP_RESPONSE_BYTES);
             }
         } catch (IOException e) {
+            file.delete();
             throw new CaException(String.format("Cannot download file: %s", url), e);
         }
     }

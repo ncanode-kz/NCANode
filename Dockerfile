@@ -6,6 +6,6 @@ ARG artifact=build/libs/NCANode.jar
 COPY $artifact /app/NCANode.jar
 RUN mkdir /app/cache
 VOLUME /app/cache
-ENTRYPOINT ["java", "-jar", "NCANode.jar"]
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar NCANode.jar"]
 HEALTHCHECK --interval=20s --timeout=30s --retries=7 \
     CMD wget -O - http://127.0.0.1:14579/actuator/health | grep -v DOWN || exit 1

@@ -11,6 +11,7 @@ import kz.gov.pki.kalkan.ocsp.*;
 import kz.ncanode.configuration.OcspConfiguration;
 import kz.ncanode.dto.ocsp.OcspResult;
 import kz.ncanode.dto.ocsp.OcspStatus;
+import kz.ncanode.util.Util;
 import kz.ncanode.wrapper.CertificateWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +21,7 @@ import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigInteger;
@@ -65,7 +67,8 @@ public class OcspService {
                 OCSPReq request = buildOcspRequest(cert.getX509Certificate().getSerialNumber(), issuer.getX509Certificate(), nonce);
 
                 try (CloseableHttpResponse response = makeRequest(entry.getValue().toString(), request.getEncoded())) {
-                    statuses.add(processOcspResponse(response.getEntity().getContent(), nonce));
+                    byte[] body = Util.readEntityBounded(response.getEntity(), Util.MAX_HTTP_RESPONSE_BYTES);
+                    statuses.add(processOcspResponse(new ByteArrayInputStream(body), nonce));
                 }
             } catch (Exception e) {
                 statuses.add(OcspStatus.builder()
@@ -101,7 +104,7 @@ public class OcspService {
                 OCSPReq request = buildOcspRequest(cert.getX509Certificate().getSerialNumber(), issuer.getX509Certificate(), nonce);
 
                 try (CloseableHttpResponse response = makeRequest(entry.getValue().toString(), request.getEncoded())) {
-                    byte[] responseBytes = response.getEntity().getContent().readAllBytes();
+                    byte[] responseBytes = Util.readEntityBounded(response.getEntity(), Util.MAX_HTTP_RESPONSE_BYTES);
 
                     if (new OCSPResp(responseBytes).getStatus() == 0) {
                         responses.add(responseBytes);

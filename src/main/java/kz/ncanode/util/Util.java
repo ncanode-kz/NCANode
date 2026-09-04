@@ -6,8 +6,11 @@ import kz.gov.pki.kalkan.asn1.pkcs.PKCSObjectIdentifiers;
 import kz.gov.pki.kalkan.jce.provider.cms.CMSSignedDataGenerator;
 import lombok.experimental.UtilityClass;
 import lombok.val;
+import org.apache.http.HttpEntity;
 import org.slf4j.Logger;
 
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -97,6 +100,57 @@ public class Util {
         }
         else {
             return CMSSignedDataGenerator.DIGEST_GOST34311_95;
+        }
+    }
+
+    /** Потолок размера ответа для OCSP / TSP / CA — эти ответы измеряются килобайтами. */
+    public static final long MAX_HTTP_RESPONSE_BYTES = 8L << 20;
+    /** Потолок размера скачиваемого CRL. Боевой GOST-CRL ~20 МБ, здесь ~6x запаса. */
+    public static final long MAX_CRL_DOWNLOAD_BYTES = 128L << 20;
+
+    /**
+     * Читает тело HTTP-ответа в память с ограничением размера. Объявленный сверх лимита
+     * {@code Content-Length} отвергается до чтения тела.
+     */
+    public static byte[] readEntityBounded(HttpEntity entity, long maxBytes) throws IOException {
+        if (entity.getContentLength() > maxBytes) {
+            throw new IOException("Response too large: Content-Length " + entity.getContentLength() + " > limit " + maxBytes);
+        }
+
+        try (InputStream in = entity.getContent()) {
+            byte[] data = in.readNBytes((int) Math.min(maxBytes + 1, Integer.MAX_VALUE));
+
+            if (data.length > maxBytes) {
+                throw new IOException("Response too large: exceeded limit " + maxBytes + " bytes");
+            }
+
+            return data;
+        }
+    }
+
+    /**
+     * Потоково копирует тело HTTP-ответа в {@code out}, обрывая обмен на превышении лимита.
+     * Память при этом не растёт (буфер 64 КБ).
+     */
+    public static void copyEntityBounded(HttpEntity entity, OutputStream out, long maxBytes) throws IOException {
+        if (entity.getContentLength() > maxBytes) {
+            throw new IOException("Response too large: Content-Length " + entity.getContentLength() + " > limit " + maxBytes);
+        }
+
+        try (InputStream in = entity.getContent()) {
+            byte[] buf = new byte[64 * 1024];
+            long total = 0;
+            int n;
+
+            while ((n = in.read(buf)) != -1) {
+                total += n;
+
+                if (total > maxBytes) {
+                    throw new IOException("Response too large: exceeded limit " + maxBytes + " bytes");
+                }
+
+                out.write(buf, 0, n);
+            }
         }
     }
 

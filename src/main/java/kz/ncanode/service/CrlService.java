@@ -272,11 +272,12 @@ public class CrlService {
             var file = path.toFile();
 
             try(FileOutputStream out = new FileOutputStream(file)) {
-                entity.writeTo(out);
+                Util.copyEntityBounded(entity, out, Util.MAX_CRL_DOWNLOAD_BYTES);
             }
 
             return file;
         } catch (IOException e) {
+            path.toFile().delete(); // не оставляем обрезанный CRL в кэше
             throw new CrlException(e.getMessage(), e);
         }
     }

@@ -190,7 +190,8 @@ public class TspService {
                 throw new TspException(String.format("Invalid TSP response status: %d", statusCode));
             }
 
-            return new TimeStampResponse(response.getEntity().getContent());
+            return new TimeStampResponse(new java.io.ByteArrayInputStream(
+                Util.readEntityBounded(response.getEntity(), Util.MAX_HTTP_RESPONSE_BYTES)));
         } catch (IOException | TSPException e) {
             throw new TspException("TSP request failure.", e);
         }
