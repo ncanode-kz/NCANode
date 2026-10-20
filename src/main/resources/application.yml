@@ -7,6 +7,7 @@ ncanode:
   system:
     detailedErrors: ${NCANODE_DEBUG:false}
     cacheDir: ${NCANODE_CACHE_DIR:./cache}
+    maxJsonStringLength: ${NCANODE_MAX_JSON_STRING_LENGTH:31457280}
   crl:
     enabled: ${NCANODE_CRL_ENABLED:true}
     ttl: ${NCANODE_CRL_TTL:1440}
