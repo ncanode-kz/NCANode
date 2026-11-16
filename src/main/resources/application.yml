@@ -17,6 +17,11 @@ ncanode:
       ttl: ${NCANODE_CRL_DELTA_TTL:60}
   http-client:
     connectionTtl: ${NCANODE_HTTP_CLIENT_CONNECTION_TTL:10}
+    connectTimeout: ${NCANODE_HTTP_CLIENT_CONNECT_TIMEOUT:10}
+    socketTimeout: ${NCANODE_HTTP_CLIENT_SOCKET_TIMEOUT:30}
+    connectionRequestTimeout: ${NCANODE_HTTP_CLIENT_CONNECTION_REQUEST_TIMEOUT:10}
+    maxConnections: ${NCANODE_HTTP_CLIENT_MAX_CONNECTIONS:50}
+    maxConnectionsPerRoute: ${NCANODE_HTTP_CLIENT_MAX_CONNECTIONS_PER_ROUTE:20}
     userAgent: ${NCANODE_HTTP_CLIENT_USER_AGENT:}
     proxy:
       url: ${NCANODE_PROXY_URL:}
