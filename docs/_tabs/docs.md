@@ -54,6 +54,11 @@ docker run -p 14579:14579 -v ncanode_cache:/app/cache -d malikzh/ncanode
   * https://crl.pki.gov.kz/nca_d_rsa_2022.crl
 * `NCANODE_CRL_DELTA_TTL` - Время жизни Delta-CRL в кэше (по умолчанию 1440 минут)
 * `NCANODE_HTTP_CLIENT_CONNECTION_TTL` - Время удержания соединения HTTP-клиента (когда скачиваются CRL\OCSP\Корневые сертификаты)
+* `NCANODE_HTTP_CLIENT_CONNECT_TIMEOUT` - Таймаут установки соединения HTTP-клиента (по умолчанию 10 секунд)
+* `NCANODE_HTTP_CLIENT_SOCKET_TIMEOUT` - Таймаут ожидания данных от сервера: максимальная пауза между пакетами, а не время всего ответа (по умолчанию 30 секунд)
+* `NCANODE_HTTP_CLIENT_CONNECTION_REQUEST_TIMEOUT` - Таймаут ожидания свободного соединения из пула HTTP-клиента (по умолчанию 10 секунд)
+* `NCANODE_HTTP_CLIENT_MAX_CONNECTIONS` - Максимальное количество соединений в пуле HTTP-клиента (по умолчанию 50)
+* `NCANODE_HTTP_CLIENT_MAX_CONNECTIONS_PER_ROUTE` - Максимальное количество соединений HTTP-клиента к одному хосту (по умолчанию 20)
 * `NCANODE_HTTP_CLIENT_USER_AGENT` - HTTP заголовок User-Agent у клиента
 * `NCANODE_PROXY_URL` - Прокси для HTTP-клиента. Через этот прокси будут происходить все запросы из NCANode.
 * `NCANODE_PROXY_USERNAME` - Имя пользователя в прокси

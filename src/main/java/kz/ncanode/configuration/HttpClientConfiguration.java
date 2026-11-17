@@ -11,6 +11,7 @@ import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.Credentials;
 import org.apache.http.auth.UsernamePasswordCredentials;
 import org.apache.http.client.CredentialsProvider;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.impl.client.BasicCredentialsProvider;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
@@ -33,6 +34,22 @@ import java.util.concurrent.TimeUnit;
 public class HttpClientConfiguration {
     private HttpProxyConfig proxy;
     private Integer connectionTtl;
+
+    /** Таймаут установки TCP-соединения, секунды */
+    private Integer connectTimeout = 10;
+
+    /** Таймаут ожидания данных от сервера (пауза между пакетами, а не время всего ответа), секунды */
+    private Integer socketTimeout = 30;
+
+    /** Таймаут ожидания свободного соединения из пула, секунды */
+    private Integer connectionRequestTimeout = 10;
+
+    /** Максимум соединений в пуле клиента */
+    private Integer maxConnections = 50;
+
+    /** Максимум соединений к одному хосту */
+    private Integer maxConnectionsPerRoute = 20;
+
     private String userAgent = "NCANode/" + HttpClientConfiguration.class.getPackage().getImplementationVersion();
 
     @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
@@ -63,10 +80,25 @@ public class HttpClientConfiguration {
 
         customClient.setConnectionTimeToLive(connectionTtl, TimeUnit.SECONDS);
 
+        // без таймаутов запрос к зависшему CRL/OCSP/TSP-серверу держит поток бесконечно
+        customClient.setDefaultRequestConfig(RequestConfig.custom()
+            .setConnectTimeout(secondsToMillis(connectTimeout))
+            .setSocketTimeout(secondsToMillis(socketTimeout))
+            .setConnectionRequestTimeout(secondsToMillis(connectionRequestTimeout))
+            .build());
+
+        // по умолчанию в пуле Apache HttpClient всего 2 соединения на хост
+        customClient.setMaxConnTotal(maxConnections);
+        customClient.setMaxConnPerRoute(maxConnectionsPerRoute);
+
         customClient.setUserAgent(userAgent);
         customClient.setRedirectStrategy(new LaxRedirectStrategy());
         customClient.disableCookieManagement();
 
         return customClient.build();
+    }
+
+    private static int secondsToMillis(int seconds) {
+        return (int) TimeUnit.SECONDS.toMillis(seconds);
     }
 }
