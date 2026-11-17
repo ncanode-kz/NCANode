@@ -6,21 +6,26 @@ import kz.ncanode.dto.crl.CrlResult
 import kz.ncanode.exception.ServerException
 import kz.ncanode.service.CrlService
 import kz.ncanode.service.DirectoryService
+import kz.ncanode.util.Util
 import kz.ncanode.wrapper.KalkanWrapper
 import org.apache.http.StatusLine
 import org.apache.http.client.methods.CloseableHttpResponse
 import org.apache.http.entity.ByteArrayEntity
+import org.apache.http.entity.InputStreamEntity
 import org.apache.http.impl.client.CloseableHttpClient
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.scheduling.TaskScheduler
 import org.springframework.util.ResourceUtils
 import spock.lang.Specification
+import spock.lang.Timeout
 
 import javax.security.auth.x500.X500Principal
 import java.security.cert.X509CRL
 import java.security.cert.X509CRLEntry
 import java.security.cert.X509Certificate
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
@@ -354,5 +359,136 @@ class CrlServiceExtraTest extends Specification implements WithTestData {
         status.file == 'nca.crl'
         status.revocationDate == revokedAt
         status.reason == ''
+    }
+
+    private File ownCrlFile(URL url) {
+        new File(cacheDir, Util.sha1(url.toString()) + '.crl')
+    }
+
+    private void staleCacheConfiguration(URL url) {
+        crlConfiguration.isEnabled() >> true
+        crlConfiguration.getTtl() >> 10
+        crlConfiguration.getUrlList() >> [(Util.sha1(url.toString())): url]
+        directoryService.getCachePathFor(_) >> Optional.of(cacheDir)
+    }
+
+    def "updateCache does not re-download an actual CRL file"() {
+        given:
+        def url = new URL('http://example.test/nca.crl')
+        def crlFile = ownCrlFile(url)
+        crlFile.bytes = crlBytes('nca_rsa_test.crl')
+        staleCacheConfiguration(url)
+
+        when:
+        service.updateCache(false, crlConfiguration, 'crl/full')
+
+        then:
+        0 * client.execute(_)
+        crlFile.bytes == crlBytes('nca_rsa_test.crl')
+    }
+
+    def "updateCache replaces a stale CRL file with the downloaded one"() {
+        given:
+        def url = new URL('http://example.test/nca.crl')
+        def crlFile = ownCrlFile(url)
+        crlFile.text = 'stale'
+        crlFile.setLastModified(0L)
+        staleCacheConfiguration(url)
+        client.execute(_) >> httpResponse(200, crlBytes('nca_rsa_test.crl'))
+
+        when:
+        service.updateCache(false, crlConfiguration, 'crl/full')
+
+        then:
+        crlFile.bytes == crlBytes('nca_rsa_test.crl')
+        cacheDir.list() as List == [crlFile.name]
+    }
+
+    def "updateCache keeps the previous CRL file when the download fails"() {
+        given:
+        def url = new URL('http://example.test/nca.crl')
+        def crlFile = ownCrlFile(url)
+        crlFile.bytes = crlBytes('nca_gost2022_test.crl')
+        crlFile.setLastModified(0L)
+        staleCacheConfiguration(url)
+        client.execute(_) >> httpResponse(500, null)
+        def cert = kalkanWrapper.read(KEY_CEO_REVOKED_2015, null, KEY_INDIVIDUAL_VALID_2015_PASSWORD).certificate
+
+        when:
+        service.updateCache(false, crlConfiguration, 'crl/full')
+
+        then: "без CRL проверка отвечала бы ACTIVE на отозванный сертификат"
+        crlFile.bytes == crlBytes('nca_gost2022_test.crl')
+        service.verify(cert).result == CrlResult.REVOKED
+    }
+
+    @Timeout(10)
+    def "updateCache does not lock the cache directory and hide the previous CRL while downloading"() {
+        given: "актуальный CRL устарел, а сервер отдаёт новый с паузой посреди передачи"
+        def url = new URL('http://example.test/nca.crl')
+        def crlFile = ownCrlFile(url)
+        crlFile.bytes = crlBytes('nca_gost2022_test.crl')
+        crlFile.setLastModified(0L)
+        staleCacheConfiguration(url)
+
+        def body = crlBytes('nca_rsa_test.crl')
+        def transferStalled = new CountDownLatch(1)
+        def releaseTransfer = new CountDownLatch(1)
+        def stalledStream = new InputStream() {
+            int position = 0
+
+            @Override
+            int read() {
+                def single = new byte[1]
+                return read(single, 0, 1) == -1 ? -1 : (single[0] & 0xff)
+            }
+
+            @Override
+            int read(byte[] buffer, int offset, int length) {
+                if (position < 100) {
+                    int count = Math.min(length, 100 - position)
+                    System.arraycopy(body, position, buffer, offset, count)
+                    position += count
+                    return count
+                }
+
+                transferStalled.countDown()
+                releaseTransfer.await(10, TimeUnit.SECONDS)
+                throw new IOException('connection reset')
+            }
+        }
+        def statusLine = Mock(StatusLine) { getStatusCode() >> 200 }
+        client.execute(_) >> Mock(CloseableHttpResponse) {
+            getStatusLine() >> statusLine
+            getEntity() >> new InputStreamEntity(stalledStream, -1)
+        }
+        def cert = kalkanWrapper.read(KEY_CEO_REVOKED_2015, null, KEY_INDIVIDUAL_VALID_2015_PASSWORD).certificate
+
+        when:
+        def update = Thread.start { service.updateCache(false, crlConfiguration, 'crl/full') }
+        transferStalled.await(5, TimeUnit.SECONDS)
+
+        def lockAcquired = new CountDownLatch(1)
+        Thread.start { synchronized (directoryService) { lockAcquired.countDown() } }
+        def lockedDuringDownload = !lockAcquired.await(2, TimeUnit.SECONDS)
+        def filesDuringDownload = service.getCrlFiles('crl/full')*.name
+        def statusDuringDownload = service.verify(cert).result
+
+        releaseTransfer.countDown()
+        update.join()
+
+        then: "CaService.getRootCertificates берёт ту же блокировку и не должен ждать скачивания"
+        !lockedDuringDownload
+
+        and: "недокачанный файл не виден, работает прежний CRL"
+        filesDuringDownload == [crlFile.name]
+        statusDuringDownload == CrlResult.REVOKED
+
+        and: "после обрыва передачи прежний CRL на месте, временный файл удалён"
+        crlFile.bytes == crlBytes('nca_gost2022_test.crl')
+        cacheDir.list() as List == [crlFile.name]
+
+        cleanup:
+        releaseTransfer.countDown()
     }
 }

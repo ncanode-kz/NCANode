@@ -25,11 +25,13 @@ import org.springframework.scheduling.support.PeriodicTrigger;
 import jakarta.annotation.PostConstruct;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.net.MalformedURLException;
+import java.io.OutputStream;
 import java.net.URL;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.security.cert.*;
 import java.time.Duration;
 import java.util.*;
@@ -47,6 +49,7 @@ public class CrlService {
     private final static String CRL_CACHE_FULL_DIR_NAME = "crl/full";
     private final static String CRL_CACHE_DELTA_DIR_NAME = "crl/delta";
     private final static String CRL_FILE_EXTENSION = ".crl";
+    private final static String CRL_TEMP_FILE_EXTENSION = ".part";
 
     private final DirectoryService directoryService;
     private final CrlConfiguration crlConfiguration;
@@ -212,53 +215,65 @@ public class CrlService {
     /**
      * Обновляет кэш CRL
      *
+     * <p>Сетевые запросы идут без блокировки {@code directoryService}: её же берёт
+     * {@code CaService.getRootCertificates}, и на время скачивания большого CRL вставали бы все проверки.
+     * Актуальный файл не удаляется до скачивания: новый CRL пишется во временный файл и атомарно
+     * подменяет старый, поэтому при ошибке скачивания продолжает работать прежний CRL.
+     *
      * @param force Если true, то кэш будет обновлен в любом случае
      */
     public synchronized void updateCache(boolean force, CrlConfiguration crlConfiguration, String cacheDirectory) {
-        synchronized (directoryService) {
-            if (!crlConfiguration.isEnabled() || crlConfiguration.getTtl() <= 0) {
-                return;
+        if (!crlConfiguration.isEnabled() || crlConfiguration.getTtl() <= 0) {
+            return;
+        }
+
+        log.info("Updating CRL cache...");
+        final long currentTime = System.currentTimeMillis();
+        final long ttlMillis = (long) crlConfiguration.getTtl() * 60000L;
+        final Map<String, URL> urls = crlConfiguration.getUrlList();
+        final Set<String> ownFileNames = new HashSet<>();
+
+        int updatedCount = 0;
+
+        // Скачиваем отсутствующие и устаревшие CRL файлы
+        for (var crlEntry : urls.entrySet()) {
+            final String crlFileName = crlEntry.getKey() + CRL_FILE_EXTENSION;
+            final File crlFile = getCrlCacheFilePathFor(cacheDirectory, crlFileName);
+            ownFileNames.add(crlFileName);
+
+            if (!force && isActual(crlFile, currentTime, ttlMillis)) {
+                log.debug("CRL file {} is actual", crlFile);
+                continue;
             }
 
-            log.info("Updating CRL cache...");
-            long currentTime = System.currentTimeMillis();
-
-            // Удаляем старые файлы CRL
-            for (var crlFile : getCrlFiles(cacheDirectory)) {
-                if (!force && crlFile.exists() && crlFile.isFile() && crlFile.canRead() && (currentTime - crlFile.lastModified()) <= (long) crlConfiguration.getTtl() * 60000L) {
-                    log.debug("CRL file {} is actual. This file will not be removed", crlFile);
-                    continue;
-                }
-
-                if (!crlFile.delete()) {
-                    log.error("Cannot delete CRL cache file: {}", crlFile);
-                } else {
-                    forgetCrlFile(cacheDirectory, crlFile.getName());
-                }
-            }
-
-            int updatedCount = 0;
-
-            // Скачиваем новые CRL файлы
-            for (var crlEntry : crlConfiguration.getUrlList().entrySet()) {
-                var crlFile = new File(directoryService.getCachePathFor(cacheDirectory).orElseThrow(), crlEntry.getKey() + CRL_FILE_EXTENSION);
-
-                if (crlFile.exists()) {
-                    continue;
-                }
-
-                downloadCrl(cacheDirectory, crlEntry.getValue());
+            if (refreshCrl(cacheDirectory, crlEntry.getValue())) {
                 updatedCount++;
             }
+        }
 
-            if (updatedCount == 0) {
-                log.info("Nothing to update in CRL cache.");
-            } else {
-                log.info("{} files updated in CRL cache", updatedCount);
+        // Удаляем устаревшие файлы, которые этот сервис не обновляет (например, URL убран из настроек)
+        for (var crlFile : getCrlFiles(cacheDirectory)) {
+            if (ownFileNames.contains(crlFile.getName()) || isActual(crlFile, currentTime, ttlMillis)) {
+                continue;
             }
+
+            if (!crlFile.delete()) {
+                log.error("Cannot delete CRL cache file: {}", crlFile);
+            } else {
+                forgetCrlFile(cacheDirectory, crlFile.getName());
+            }
+        }
+
+        if (updatedCount == 0) {
+            log.info("Nothing to update in CRL cache.");
+        } else {
+            log.info("{} files updated in CRL cache", updatedCount);
         }
     }
 
+    private static boolean isActual(File crlFile, long currentTime, long ttlMillis) {
+        return crlFile.isFile() && crlFile.canRead() && (currentTime - crlFile.lastModified()) <= ttlMillis;
+    }
 
     /**
      * Загружает CRL файл
@@ -282,6 +297,15 @@ public class CrlService {
      * @param url
      */
     public void downloadCrl(String cacheDirName, URL url) {
+        refreshCrl(cacheDirName, url);
+    }
+
+    /**
+     * Скачивает CRL файл и подменяет им файл в кэше
+     *
+     * @return true, если файл скачан и подменён
+     */
+    private boolean refreshCrl(String cacheDirName, URL url) {
         try {
             String crlUrl = url.toString();
             String crlFileName = Util.sha1(crlUrl) + CRL_FILE_EXTENSION;
@@ -290,8 +314,10 @@ public class CrlService {
             final File downloadedFile = download(crlUrl, getCrlCacheFilePathFor(cacheDirName, crlFileName).toPath());
             forgetCrlFile(cacheDirName, crlFileName);
             log.info("CRL file \"{}\" successfully downloaded. Size: {} bytes", crlFileName, downloadedFile.length());
+            return true;
         } catch (CrlException e) {
             log.error("CRL File download failure", e.getCause());
+            return false;
         }
     }
 
@@ -307,8 +333,14 @@ public class CrlService {
             .toList();
     }
 
+    /**
+     * Скачивает файл во временный файл рядом с целевым и атомарно подменяет им целевой.
+     * Временный файл не имеет расширения {@code .crl}, поэтому недокачанный CRL не виден {@link #getCrlFiles}
+     */
     private File download(String url, Path path) throws CrlException {
-        try(CloseableHttpResponse response = client.execute(new HttpGet(url))) {
+        Path tempFile = null;
+
+        try (CloseableHttpResponse response = client.execute(new HttpGet(url))) {
             int status = response.getStatusLine().getStatusCode();
 
             if (status != HttpStatus.OK.value()) {
@@ -321,16 +353,34 @@ public class CrlService {
                 throw new CrlException(String.format("Got empty request from: %s", url));
             }
 
-            var file = path.toFile();
+            tempFile = Files.createTempFile(path.getParent(), path.getFileName().toString() + ".", CRL_TEMP_FILE_EXTENSION);
 
-            try(FileOutputStream out = new FileOutputStream(file)) {
+            try (OutputStream out = Files.newOutputStream(tempFile)) {
                 Util.copyEntityBounded(entity, out, Util.MAX_CRL_DOWNLOAD_BYTES);
             }
 
-            return file;
+            replaceFile(tempFile, path);
+            tempFile = null;
+
+            return path.toFile();
         } catch (IOException e) {
-            path.toFile().delete(); // не оставляем обрезанный CRL в кэше
             throw new CrlException(e.getMessage(), e);
+        } finally {
+            if (tempFile != null) {
+                try {
+                    Files.deleteIfExists(tempFile); // не оставляем недокачанный CRL в кэше
+                } catch (IOException e) {
+                    log.warn("Cannot delete temporary CRL file {}", tempFile, e);
+                }
+            }
+        }
+    }
+
+    private static void replaceFile(Path source, Path target) throws IOException {
+        try {
+            Files.move(source, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+        } catch (AtomicMoveNotSupportedException e) {
+            Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
